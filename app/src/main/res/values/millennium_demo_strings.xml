@@ -1,0 +1,7 @@
+<resources>
+    <string name="millennium_settings_title">Millennium 设置</string>
+    <string name="millennium_settings_subtitle">好友动态入口 Demo</string>
+    <string name="millennium_settings_enable_entry">启用模块入口</string>
+    <string name="millennium_settings_debug_info">显示调试信息</string>
+    <string name="millennium_settings_close">关闭</string>
+</resources>
