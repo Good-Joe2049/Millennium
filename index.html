@@ -46,7 +46,8 @@ box-shadow:0 0 0 8px #0a0f1e,0 30px 60px rgba(0,0,0,.5);overflow:hidden;touch-ac
 #card{position:absolute;left:0;top:0;overflow:hidden;background:linear-gradient(145deg,#142040,#0a1022);border:1px solid rgba(54,224,255,.4);cursor:grab;will-change:left,top,width,height}
 #card.idle{animation:pulse 2.4s infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(54,224,255,.5),0 6px 18px rgba(0,0,0,.5)}50%{box-shadow:0 0 0 10px rgba(54,224,255,0),0 6px 18px rgba(0,0,0,.5)}}
-#ico{object-fit:cover;position:absolute;left:0;top:0;width:40px;height:40px;pointer-events:none;transform-origin:center;will-change:transform}
+#ico{position:absolute;left:0;top:0;width:40px;height:40px;overflow:hidden;pointer-events:none;transform-origin:center;will-change:transform;background:#000}
+#ico img{display:block;width:100%;height:100%;object-fit:cover;transform-origin:center}
 #body{position:absolute;inset:0;opacity:0;pointer-events:none;padding:16px;font-size:13px}
 #body.on{pointer-events:auto}
 .hd{display:flex;align-items:center;gap:12px;height:40px}
@@ -66,7 +67,10 @@ box-shadow:0 0 0 8px #0a0f1e,0 30px 60px rgba(0,0,0,.5);overflow:hidden;touch-ac
 .row b{font:600 18px var(--mono)}
 .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:8px;overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--c1);transition:width .9s cubic-bezier(.2,.8,.2,1)}
-.hint{font-size:13px;color:var(--dim);display:flex;gap:10px;align-items:center}
+.hint{font-size:13px;color:var(--dim);display:flex;gap:10px;align-items:center;text-align:left;max-width:320px}
+.hero>*{min-width:0}
+html{overflow-x:hidden}
+@media(max-width:400px){.phone{transform:scale(.9);transform-origin:top center;margin-bottom:-64px}}
 .hint i{width:8px;height:8px;border-radius:50%;background:var(--c1);animation:pulse 2s infinite;display:inline-block}
 /* sections */
 section{padding:90px 0}
@@ -137,7 +141,8 @@ footer a:hover{color:var(--c1)}
 <div class="row"><small>SteamDB 评分</small><b id="v5">—</b><div class="bar"><i id="bar"></i></div></div>
 <div class="row"><small>最近更新</small><b id="v6" style="font-size:15px">—</b></div>
 </div>
-<img id="ico" src="app/src/main/ic_launcher-playstore.png" alt=""></div>
+</div>
+<div id="ico"><img src="app/src/main/ic_launcher-playstore.png" alt=""></div>
 </div>
 <div class="hint"><i></i><span>可拖动悬浮球 · 点击展开 · 示例数据，仅作演示</span></div>
 </div>
@@ -202,7 +207,7 @@ const L=(a,b,k)=>a+(b-a)*k,cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 function render(){const x=L(o.x,OP.x,t),y=L(o.y,OP.y,t),w=L(OS,OP.w,t),h=L(OS,OP.h,t);
 Object.assign(card.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px',borderRadius:L(OS/2,26,t)+'px',boxShadow:t>0?`0 20px 60px rgba(0,0,0,${.6*t}),0 0 ${40*t}px rgba(54,224,255,${.18*t})`:''});
 const c0=[o.x+OS/2,o.y+OS/2],c1=[OP.x+16+20,OP.y+16+20],s=L(OS/40,1,t);
-ico.style.transform=`translate(${L(c0[0],c1[0],t)-20}px,${L(c0[1],c1[1],t)-20}px) scale(${s})`;ico.style.borderRadius=L(50,22,t)+"%";
+ico.style.transform=`translate(${L(c0[0],c1[0],t)-20}px,${L(c0[1],c1[1],t)-20}px) scale(${s})`;ico.style.borderRadius=L(50,22,t)+"%";ico.firstChild.style.transform=`scale(${L(1.32,1,t)})`;
 dim.style.opacity=t;dim.style.pointerEvents=t>.05?'auto':'none';body.style.opacity=cl((t-.55)/.4);body.classList.toggle('on',t>.9);card.classList.toggle('idle',t===0);card.style.cursor=t>.5?'default':'grab'}
 function go(to){cancelAnimationFrame(raf);const f=t,s=performance.now(),d=RM?1:560*Math.abs(to-f)+60;
 (function st(n){const p=cl((n-s)/d);t=L(f,to,1-Math.pow(1-p,4));render();if(p<1)raf=requestAnimationFrame(st);else{t=to;render()}})(s)}
