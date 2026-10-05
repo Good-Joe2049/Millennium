@@ -41,6 +41,8 @@ Millennium 为 Android 版 Steam 提供一个应用内悬浮面板。浏览游�
 
 ## ✨ 功能一览
 
+<a href="./docs/images/panel-witcher3.jpg"><img align="right" src="./docs/images/panel-witcher3.jpg" width="200" alt="巫师 3 游戏数据面板" /></a>
+
 | 功能 | 可以查看或完成什么 |
 | :--- | :--- |
 | **悬浮面板** | 点击展开、拖动悬浮球、记住位置 |
@@ -64,6 +66,8 @@ Millennium 为 Android 版 Steam 提供一个应用内悬浮面板。浏览游�
 ### 🗓️ 看更新日期
 
 更新日期与在线数据共用一次 SteamDB 游戏信息查询。这里显示的是 SteamDB 返回的游戏更新日期，不是发售日期或模块最近查询的时间。
+
+<br clear="both" />
 
 <a id="install"></a>
 
