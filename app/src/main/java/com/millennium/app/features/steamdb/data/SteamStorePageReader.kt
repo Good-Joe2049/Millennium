@@ -18,6 +18,17 @@ internal object SteamStorePageReader {
         return path[1].toIntOrNull()?.takeIf { it > 0 }
     }
 
+    /** Uses Steam's stable URL slug for the compact panel header. */
+    fun displayName(url: String?): String? {
+        val uri = runCatching { url?.toUri() }.getOrNull() ?: return null
+        if (uri.host?.lowercase(Locale.ROOT) !in listOf("store.steampowered.com", "store.steamchina.com")) return null
+        return uri.pathSegments.getOrNull(2)
+            ?.replace('-', ' ')
+            ?.replace('_', ' ')
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+
     fun read(webView: WebView, expectedAppId: Int, callback: (Result<SteamStorePage>) -> Unit) {
         if (!webView.settings.javaScriptEnabled || appId(webView.url) != expectedAppId) {
             callback(Result.failure(IOException("Store page unavailable or JavaScript disabled")))
@@ -37,6 +48,7 @@ internal object SteamStorePageReader {
                         data.optString("currency").takeIf { it.matches(Regex("[A-Z]{3}(-[A-Z]+)?")) },
                         data.optBoolean("free"),
                         reviewCount(data, "positive"), reviewCount(data, "negative"),
+                        data.optString("name").takeIf { it.isNotBlank() && it != "null" },
                     )
                 })
             }
@@ -84,9 +96,11 @@ internal object SteamStorePageReader {
             }
           }
           const reviews = document.querySelector('div[data-featuretarget="appreviews"]');
+          const name = (document.querySelector('.apphub_AppName')?.textContent ||
+            document.querySelector('meta[property="og:title"]')?.content || '').trim();
           const filters = parse(reviews?.dataset?.props)?.filter_options;
           const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
-          return JSON.stringify({appId: app ? Number(app[1]) : null, currency,
+          return JSON.stringify({appId: app ? Number(app[1]) : null, currency, name,
             free: Number.isFinite(price) && price >= 0 && price < 0.01,
             positive: count(filters?.nReviewsPositive), negative: count(filters?.nReviewsNegative)});
         })()

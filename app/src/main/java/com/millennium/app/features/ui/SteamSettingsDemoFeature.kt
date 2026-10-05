@@ -15,7 +15,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -24,13 +23,12 @@ import android.view.ViewOutlineProvider
 import android.view.animation.PathInterpolator
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.content.res.ColorStateList
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.millennium.app.features.steamdb.ui.SteamDbUi
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.content.res.ResourcesCompat
@@ -104,7 +102,11 @@ internal class SteamSettingsDemoFeature(
             clipToOutline = false
             outlineProvider = roundedCardOutline(activity)
             background = cardBackground(activity)
-            elevation = dp(activity, 10).toFloat()
+            foreground = SteamFloatingBorder(
+                activity.resources.displayMetrics.density,
+                dp(activity, BUBBLE_SIZE_DP / 2).toFloat(),
+            )
+            elevation = dp(activity, 6).toFloat()
         }
         val bubble = buildBubble(activity)
         card.addView(bubble, FrameLayout.LayoutParams(-1, -1))
@@ -113,7 +115,7 @@ internal class SteamSettingsDemoFeature(
 
         lateinit var state: FloatingState
         val statsPanel = steamDbPanelController.buildPanel(activity)
-        val panel = buildPanel(activity, statsPanel) { collapse(state) }
+        val panel = statsPanel.view.wrap { collapse(state) }
         panel.visibility = View.GONE
         card.addView(panel, FrameLayout.LayoutParams(-1, -1))
         val sharedIcon = buildIconView(activity, loadIcon(activity))
@@ -131,7 +133,7 @@ internal class SteamSettingsDemoFeature(
         installBubbleTouch(state)
         root.post {
             placeBubble(state)
-            positionSharedIcon(state, opening = false, progress = 0f)
+            positionSharedIcon(state, opening = false, progress = 1f)
             refreshSharedIcon(state)
             if (state.sharedIcon.drawable == null) {
                 mainHandler.postDelayed({
@@ -394,6 +396,10 @@ internal class SteamSettingsDemoFeature(
         params.width = iconSize
         params.height = iconSize
         state.sharedIcon.layoutParams = params
+        val panelProgress = if (opening) progress else 1f - progress
+        (state.sharedIcon.background as? GradientDrawable)?.setColor(
+            ((255 * panelProgress).toInt() shl 24) or (SteamDbUi.CARD and 0x00ffffff),
+        )
     }
 
     private fun refreshSharedIcon(state: FloatingState) {
@@ -438,17 +444,23 @@ internal class SteamSettingsDemoFeature(
         if (state.animator?.isRunning == true || state.expanded == opening) return
         if (state.root.width == 0 || state.root.height == 0) return
         val bubbleSize = dp(state.activity, BUBBLE_SIZE_DP)
-        val panelWidth = min(state.root.width - dp(state.activity, 48), dp(state.activity, 430))
+        val safe = ViewCompat.getRootWindowInsets(state.root)
+            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+        val safeLeft = safe?.left ?: 0
+        val safeTop = safe?.top ?: 0
+        val safeWidth = state.root.width - safeLeft - (safe?.right ?: 0)
+        val safeHeight = state.root.height - safeTop - (safe?.bottom ?: 0)
+        val panelWidth = min(safeWidth - dp(state.activity, 32), dp(state.activity, 400))
             .coerceAtLeast(bubbleSize)
-        val panelHeight = min((state.root.height * 0.72f).toInt(), dp(state.activity, 620))
-            .coerceAtLeast(bubbleSize)
+        val desiredHeight = state.statsPanel.view.heightForWidth(panelWidth)
+        val panelHeight = min(desiredHeight, safeHeight - dp(state.activity, 32)).coerceAtLeast(bubbleSize)
         val startParams = state.card.layoutParams as? FrameLayout.LayoutParams ?: return
         val startLeft = startParams.leftMargin
         val startTop = startParams.topMargin
         val startWidth = state.card.width
         val startHeight = state.card.height
-        val endLeft = if (opening) (state.root.width - panelWidth) / 2 else state.bubbleLeft
-        val endTop = if (opening) (state.root.height - panelHeight) / 2 else state.bubbleTop
+        val endLeft = if (opening) safeLeft + (safeWidth - panelWidth) / 2 else state.bubbleLeft
+        val endTop = if (opening) safeTop + (safeHeight - panelHeight) / 2 else state.bubbleTop
         val endWidth = if (opening) panelWidth else bubbleSize
         val endHeight = if (opening) panelHeight else bubbleSize
         emit(
@@ -478,12 +490,16 @@ internal class SteamSettingsDemoFeature(
                 params.height = lerp(startHeight, endHeight, raw)
                 state.card.layoutParams = params
                 val background = state.card.background as? GradientDrawable
-                background?.cornerRadius = lerp(
+                val cornerRadius = lerp(
                     if (opening) dp(state.activity, BUBBLE_SIZE_DP / 2).toFloat() else dp(state.activity, PANEL_RADIUS_DP).toFloat(),
                     if (opening) dp(state.activity, PANEL_RADIUS_DP).toFloat() else dp(state.activity, BUBBLE_SIZE_DP / 2).toFloat(),
                     raw,
                 )
-                background?.setColor(interpolateColor(if (opening) raw else 1f - raw))
+                val shapeProgress = if (opening) raw else 1f - raw
+                background?.cornerRadius = cornerRadius
+                background?.setColor(interpolateColor(shapeProgress))
+                (state.card.foreground as? SteamFloatingBorder)?.update(cornerRadius, shapeProgress)
+                state.card.elevation = lerp(dp(state.activity, 6).toFloat(), dp(state.activity, 10).toFloat(), shapeProgress)
                 state.card.invalidateOutline()
                 val visibleProgress = if (opening) raw else 1f - raw
                 state.scrim.alpha = visibleProgress * SCRIM_ALPHA
@@ -527,6 +543,10 @@ internal class SteamSettingsDemoFeature(
         contentDescription = "Millennium"
         setImageDrawable(drawable)
         imageTintList = ColorStateList.valueOf(Color.WHITE)
+        background = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            cornerRadius = dp(activity, 8).toFloat()
+        }
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         translationZ = dp(activity, ICON_Z_OFFSET_DP).toFloat()
         isClickable = false
@@ -549,72 +569,6 @@ internal class SteamSettingsDemoFeature(
                 }
             outline.setRoundRect(0, 0, view.width, view.height, radius.coerceAtLeast(0f))
         }
-    }
-
-    private fun buildPanel(
-        activity: Activity,
-        statsPanel: SteamDbPanelController.Panel,
-        onClose: () -> Unit,
-    ): View {
-        val strings = moduleResourceContext(activity)
-        val panelBackground = GradientDrawable().apply {
-            setColor(Color.rgb(36, 39, 47))
-            cornerRadius = dp(activity, 14).toFloat()
-            setStroke(dp(activity, 1), Color.rgb(75, 80, 92))
-        }
-        val panel = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(
-                dp(activity, PANEL_PADDING_HORIZONTAL_DP),
-                dp(activity, PANEL_PADDING_TOP_DP),
-                dp(activity, PANEL_PADDING_HORIZONTAL_DP),
-                dp(activity, PANEL_PADDING_BOTTOM_DP),
-            )
-            background = panelBackground
-            elevation = dp(activity, 12).toFloat()
-            isClickable = true
-            setOnClickListener { /* Keep taps inside the panel from dismissing it. */ }
-        }
-
-        val title = TextView(activity).apply {
-            text = strings.stringOrFallback(R.string.millennium_settings_title, "Millennium 设置")
-            setTextColor(Color.WHITE)
-            textSize = 22f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        val titleRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        titleRow.addView(
-            View(activity).apply {
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            },
-            LinearLayout.LayoutParams(dp(activity, PANEL_ICON_SIZE_DP), dp(activity, PANEL_ICON_SIZE_DP)).apply {
-                marginEnd = dp(activity, 8)
-            },
-        )
-        titleRow.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
-        panel.addView(titleRow, LinearLayout.LayoutParams(-1, -2))
-
-        val content = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(activity, 4), 0, dp(activity, 8))
-        }
-        content.addView(statsPanel.root, LinearLayout.LayoutParams(-1, -2))
-        panel.addView(
-            ScrollView(activity).apply { addView(content) },
-            LinearLayout.LayoutParams(-1, 0, 1f),
-        )
-
-        val close = Button(activity).apply {
-            text = strings.stringOrFallback(R.string.millennium_settings_close, "关闭")
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            setOnClickListener { onClose() }
-        }
-        panel.addView(close, LinearLayout.LayoutParams(-1, dp(activity, 48)))
-        return panel
     }
 
     @SuppressLint("DiscouragedPrivateApi")
@@ -672,14 +626,6 @@ internal class SteamSettingsDemoFeature(
         }
     }
 
-    private fun moduleResourceContext(activity: Activity): Context {
-        val resources = moduleResources(activity) ?: return activity
-        return ModuleResourcesContext(activity, resources)
-    }
-
-    private fun Context.stringOrFallback(id: Int, fallback: String): String =
-        runCatching { getString(id) }.getOrDefault(fallback)
-
     private fun loadIcon(activity: Activity): Drawable? =
         loadIconResource(activity, R.drawable.ic_millennium_floating)
 
@@ -707,13 +653,6 @@ internal class SteamSettingsDemoFeature(
         val path: String,
         val resources: Resources,
     )
-
-    private class ModuleResourcesContext(
-        base: Context,
-        private val moduleResources: Resources,
-    ) : ContextWrapper(base) {
-        override fun getResources(): Resources = moduleResources
-    }
 
     private fun saveBubblePosition(state: FloatingState) {
         val maxLeft = (state.root.width - state.card.width).coerceAtLeast(1)
@@ -797,19 +736,18 @@ internal class SteamSettingsDemoFeature(
         const val STEAM_COMMUNITY_HOST = "steamcommunity.com"
         const val STORE_STEAM_HOST = "store.steampowered.com"
         const val BUBBLE_SIZE_DP = 42
-        const val PANEL_ICON_SIZE_DP = 42
-        const val PANEL_PADDING_HORIZONTAL_DP = 22
-        const val PANEL_PADDING_TOP_DP = 20
-        const val PANEL_PADDING_BOTTOM_DP = 16
+        const val PANEL_ICON_SIZE_DP = SteamDbUi.ICON_SIZE
+        const val PANEL_PADDING_HORIZONTAL_DP = SteamDbUi.PADDING
+        const val PANEL_PADDING_TOP_DP = SteamDbUi.PADDING + (SteamDbUi.HEADER_HEIGHT - SteamDbUi.ICON_SIZE) / 2
         const val BUBBLE_MARGIN_DP = 18
-        const val PANEL_RADIUS_DP = 14
+        const val PANEL_RADIUS_DP = SteamDbUi.RADIUS
         const val PANEL_CONTENT_DELAY = 0.22f
         const val ICON_Z_OFFSET_DP = 16
         const val ICON_REFRESH_DELAY_MS = 250L
         const val MORPH_DURATION_MS = 380L
         const val SCRIM_ALPHA = 0.72f
-        const val BUBBLE_COLOR = 0xff23272f.toInt()
-        const val PANEL_COLOR = 0xff24272f.toInt()
+        const val BUBBLE_COLOR = SteamDbUi.CARD
+        const val PANEL_COLOR = SteamDbUi.PANEL
         const val POSITION_PREFS = "millennium_floating_position"
         const val POSITION_X_KEY = "x_fraction"
         const val POSITION_Y_KEY = "y_fraction"

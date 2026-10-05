@@ -7,16 +7,16 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.webkit.WebView
-import android.widget.LinearLayout
 import com.millennium.app.features.steamdb.data.SteamDbRepository
 import com.millennium.app.features.steamdb.data.SteamStorePageReader
 import com.millennium.app.features.steamdb.lastupdate.SteamDbLastUpdateFeature
 import com.millennium.app.features.steamdb.lowestprice.SteamDbLowestPriceFeature
 import com.millennium.app.features.steamdb.rating.SteamDbRatingFeature
+import com.millennium.app.features.steamdb.ui.SteamDbPanelView
 import java.lang.ref.WeakReference
 import java.util.WeakHashMap
 
-/** Connects the current WebView and four independent sections to the shared repository. */
+/** Coordinates page identity, independent features and a shared cached repository. */
 internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
     private val repository = SteamDbRepository(emit)
     private val main = Handler(Looper.getMainLooper())
@@ -26,7 +26,10 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
 
     fun buildPanel(activity: Activity): Panel {
         panels[activity]?.get()?.let { close(it) }
-        return Panel(activity).also { panels[activity] = WeakReference(it) }
+        return Panel(activity).also { panel ->
+            panels[activity] = WeakReference(panel)
+            panel.view.onRefresh = { if (panel.active) refresh(activity, panel, force = true) }
+        }
     }
 
     fun observe(webView: WebView) {
@@ -50,7 +53,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
         }
     }
 
-    fun refresh(activity: Activity, panel: Panel) {
+    fun refresh(activity: Activity, panel: Panel, force: Boolean = false) {
         panel.active = true
         val generation = ++panel.generation
         val webView = views[activity]?.get()
@@ -59,24 +62,24 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
             panel.unavailable("当前不是 Steam 游戏商店页面")
             return
         }
-        panel.online.loading()
-        panel.price.section.loading()
-        panel.rating.section.loading()
-        panel.update.section.loading()
-        panel.priceRequested = false
-        emit(Log.INFO, "steamdb panel request appId=$appId generation=$generation")
+        if (force) repository.invalidate(appId)
+        panel.view.setPage(SteamStorePageReader.displayName(webView.url), appId)
+        panel.loading()
+        emit(Log.INFO, "steamdb panel request appId=$appId generation=$generation refresh=$force")
 
         // One ExtensionApp response feeds both online stats and last update.
         repository.appInfo(activity, appId) { result ->
             if (!isCurrent(activity, panel, webView, appId, generation)) return@appInfo
             panel.online.showAppInfo(result)
             panel.update.show(result)
+            result.onSuccess { panel.view.fetchedAt(it.fetchedAtMillis) }
+            panel.finish("app", result.isSuccess)
             logResult("app-info", appId, result)
         }
-        // Independent: Steam can succeed even when SteamDB is unavailable, and vice versa.
         repository.currentPlayers(activity, appId) { result ->
             if (!isCurrent(activity, panel, webView, appId, generation)) return@currentPlayers
             panel.online.showCurrentPlayers(result)
+            panel.finish("players", result.isSuccess)
             logResult("current-players", appId, result)
         }
         readMetadata(activity, panel, webView, appId, generation, 0)
@@ -89,6 +92,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
             val page = result.getOrNull()
             val reviewsReady = page?.positiveReviews != null && page.negativeReviews != null
             if (page != null) {
+                panel.view.setPage(page.name ?: SteamStorePageReader.displayName(webView.url), appId)
                 emit(Log.DEBUG, "steamdb page metadata appId=$appId attempt=$attempt currency=${page.currency} " +
                         "free=${page.free} positive=${page.positiveReviews} negative=${page.negativeReviews}")
                 if (reviewsReady) panel.rating.show(page)
@@ -97,25 +101,27 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
                     when {
                         page.free -> {
                             panel.priceRequested = true
-                            panel.price.section.unavailable("免费游戏不查询历史最低价")
+                            panel.price.section.free()
                         }
                         currency != null -> {
                             panel.priceRequested = true
+                            panel.pending.add("price")
                             repository.lowestPrice(activity, appId, currency) { price ->
                                 if (!isCurrent(activity, panel, webView, appId, generation)) return@lowestPrice
-                                panel.price.show(price, currency)
+                                panel.price.show(price)
+                                panel.finish("price", price.isSuccess)
                                 logResult("lowest-price", appId, price)
                             }
                         }
                     }
                 }
             }
-            if ((!reviewsReady || !panel.priceRequested) && attempt < 3) {
-                // React may mount the review/currency metadata after the WebView URL changes.
+            if ((!reviewsReady || !panel.priceRequested || page.name == null) && attempt < 3) {
                 main.postDelayed({ readMetadata(activity, panel, webView, appId, generation, attempt + 1) }, 750L)
             } else {
                 if (!reviewsReady) panel.rating.section.unavailable("未读取到商店评价数据")
                 if (!panel.priceRequested) panel.price.section.unavailable("未识别到商店币种或定价地区")
+                panel.finish("metadata", reviewsReady && panel.priceRequested)
                 if (!reviewsReady || !panel.priceRequested) {
                     emit(Log.WARN, "steamdb page metadata incomplete appId=$appId reviewsReady=$reviewsReady " +
                             "priceReady=${panel.priceRequested} error=${result.exceptionOrNull()}")
@@ -160,18 +166,37 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
         val price = SteamDbLowestPriceFeature(context)
         val rating = SteamDbRatingFeature(context)
         val update = SteamDbLastUpdateFeature(context)
-        val root = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            listOf(online.section, price.section, rating.section, update.section).forEach {
-                addView(it.root, LinearLayout.LayoutParams(-1, -2))
-            }
-        }
+        private val sections = listOf(online.section, price.section, rating.section, update.section)
+        val view = SteamDbPanelView(context, sections)
+        val pending = mutableSetOf<String>()
         var active = false
         var generation = 0
         var priceRequested = false
+        private var failed = false
+        private var succeeded = false
+
+        fun loading() {
+            pending.clear()
+            pending.addAll(listOf("app", "players", "metadata"))
+            priceRequested = false
+            failed = false
+            succeeded = false
+            online.loading()
+            listOf(price.section, rating.section, update.section).forEach { it.loading() }
+            view.loading()
+        }
+
+        fun finish(task: String, success: Boolean) {
+            pending.remove(task)
+            failed = failed || !success
+            succeeded = succeeded || success
+            if (pending.isEmpty()) view.finished(failed, succeeded)
+        }
 
         fun unavailable(message: String) {
-            listOf(online.section, price.section, rating.section, update.section).forEach { it.unavailable(message) }
+            pending.clear()
+            sections.forEach { it.unavailable(message) }
+            view.unavailable(message)
         }
     }
 }

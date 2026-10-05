@@ -20,6 +20,12 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
     private val prices = Requests<Pair<Int, String>, SteamDbLowestPrice>(300_000L)
     private val players = Requests<Int, Int>(30_000L)
 
+    fun invalidate(appId: Int) {
+        apps.invalidate { it == appId }
+        players.invalidate { it == appId }
+        prices.invalidate { it.first == appId }
+    }
+
     fun appInfo(context: Context, appId: Int, callback: (Result<SteamDbAppInfo>) -> Unit) {
         val appContext = context.applicationContext
         apps.load(appId, {
@@ -45,7 +51,7 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
                 count(data, "c"), timestamp(data, "t"),
             ).also {
                 emit(Log.DEBUG, "steamdb data price received appId=$appId currency=$currency price=${it.price} " +
-                        "discount=${it.discount} occurrences=${it.occurrences} lastAt=${it.lastAt}")
+                        "limitedPrice=${it.limitedPrice} discount=${it.discount} occurrences=${it.occurrences} lastAt=${it.lastAt}")
             }
         }, callback)
     }
@@ -86,6 +92,11 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
     private inner class Requests<K, V>(private val ttl: Long) {
         private val cache = LinkedHashMap<K, Pair<Long, V>>()
         private val pending = HashMap<K, MutableList<(Result<V>) -> Unit>>()
+
+        fun invalidate(matches: (K) -> Boolean) {
+            check(Looper.myLooper() == Looper.getMainLooper())
+            cache.keys.removeAll(matches)
+        }
 
         fun load(key: K, loader: () -> V, callback: (Result<V>) -> Unit) {
             check(Looper.myLooper() == Looper.getMainLooper())
