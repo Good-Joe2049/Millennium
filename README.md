@@ -28,6 +28,10 @@
 
 </div>
 
+<p align="center">
+  <img src="./docs/images/millennium-website-preview.png" width="100%" alt="Millennium 网站界面预览" />
+</p>
+
 ---
 
 Millennium 为 Android 版 Steam 提供一个应用内悬浮面板。浏览游戏商店页面时，点击悬浮球，即可查看这款游戏的玩家活跃情况、价格记录、评分与更新日期，关闭后继续浏览。
@@ -40,8 +44,6 @@ Millennium 为 Android 版 Steam 提供一个应用内悬浮面板。浏览游�
 <a id="features"></a>
 
 ## ✨ 功能一览
-
-<a href="./docs/images/panel-witcher3.jpg"><img align="right" src="./docs/images/panel-witcher3.jpg" width="200" alt="巫师 3 游戏数据面板" /></a>
 
 | 功能 | 可以查看或完成什么 |
 | :--- | :--- |
@@ -66,8 +68,6 @@ Millennium 为 Android 版 Steam 提供一个应用内悬浮面板。浏览游�
 ### 🗓️ 看更新日期
 
 更新日期与在线数据共用一次 SteamDB 游戏信息查询。这里显示的是 SteamDB 返回的游戏更新日期，不是发售日期或模块最近查询的时间。
-
-<br clear="both" />
 
 <a id="install"></a>
 
