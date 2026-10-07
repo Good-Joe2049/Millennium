@@ -3,7 +3,6 @@ package com.millennium.app.features.steamdb.ui
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Path
@@ -68,7 +67,7 @@ internal class SteamDbPanelIcon(private val kind: Kind) : Drawable() {
             minimumWidth = SteamDbUi.dp(context, 48)
             minimumHeight = SteamDbUi.dp(context, 48)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            val mask = SteamDbUi.background(context, 24, Color.WHITE)
+            val mask = SteamDbUi.background(context, 24, SteamDbUi.TEXT)
             val plate = if (kind == Kind.CLOSE) {
                 InsetDrawable(
                     SteamDbUi.background(context, 18, SteamDbUi.CARD, SteamDbUi.BORDER),

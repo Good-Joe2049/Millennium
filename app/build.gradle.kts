@@ -10,8 +10,8 @@ android {
         applicationId = "com.millennium.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.0.2"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -50,7 +50,6 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
-    implementation("org.chromium.net:cronet-embedded:500.1.0")
     compileOnly("io.github.libxposed:api:102.0.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

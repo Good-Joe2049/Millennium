@@ -23,7 +23,7 @@ internal interface SteamDbSectionView {
 
 /** Shared styling and date formatting for the four independent feature views. */
 internal object SteamDbUi {
-    const val TEXT = 0xffffffff.toInt()
+    const val TEXT = 0xffdfe3e6.toInt()
     const val LABEL = 0xffc6d4df.toInt()
     const val MUTED = 0xff8f98a0.toInt()
     const val ACCENT = 0xff66c0f4.toInt()

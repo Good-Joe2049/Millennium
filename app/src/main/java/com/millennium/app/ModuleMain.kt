@@ -11,6 +11,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import com.millennium.app.core.SteamRuntimeDiagnostics
+import com.millennium.app.features.steamdb.network.SteamDbConnectionDiagnostics
 import com.millennium.app.features.ui.SteamUiProbeFeature
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
@@ -98,6 +99,14 @@ class ModuleMain : XposedModule() {
         )
         log(Log.INFO, TAG, "Steam package ready process=$loadedProcess loader=${param.classLoader}")
         guardLog(Log.INFO, "feature entry package=${param.packageName}")
+
+        runCatching {
+            SteamDbConnectionDiagnostics.install(this, param.classLoader) { priority, message ->
+                log(priority, "MillenniumSteamUI", message)
+            }
+        }.onFailure {
+            log(Log.WARN, "MillenniumSteamUI", "steamdb network diagnostics install failed", it)
+        }
 
         runCatching { steamRuntimeDiagnostics.install(this, param.classLoader) }
             .onFailure { log(Log.ERROR, "MillenniumSteamRuntime", "diagnostics install failed", it) }

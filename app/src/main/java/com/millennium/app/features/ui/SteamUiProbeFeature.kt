@@ -25,12 +25,21 @@ internal class SteamUiProbeFeature(
     private val installedApplications = WeakHashMap<Application, Boolean>()
     private val activityStates = IdentityHashMap<Activity, ActivityState>()
     private val reactNativeTagIdsByLoader = WeakHashMap<ClassLoader, Map<String, Int>>()
-    private val settingsDemoFeature = SteamSettingsDemoFeature(emit)
+    private val floatingPanelFeature = SteamFloatingPanelFeature(emit)
+    private val moduleSettingFeature = SteamModuleSettingFeature(emit) { activity, enabled ->
+        if (enabled) floatingPanelFeature.attach(activity)
+        else floatingPanelFeature.hideAll()
+    }
+    private val menuSettingFeature = SteamMainMenuSettingFeature(
+        emit = emit,
+        iconProvider = { activity -> floatingPanelFeature.moduleIcon(activity) },
+        onOpen = { activity -> moduleSettingFeature.show(activity) },
+    )
     // The Activity hook must keep a Boolean contract, but the floating entry handles its own touches.
     private val touchInterceptionEnabled = AtomicBoolean(false)
 
     fun setModuleApkPath(path: String?) {
-        settingsDemoFeature.setModuleApkPath(path)
+        floatingPanelFeature.setModuleApkPath(path)
     }
 
     @Synchronized
@@ -140,14 +149,19 @@ internal class SteamUiProbeFeature(
         override fun onActivityResumed(activity: Activity) {
             if (activity.packageName != STEAM_PACKAGE) return
             touchInterceptionEnabled.set(false)
-            settingsDemoFeature.attach(activity)
+            floatingPanelFeature.attach(activity)
+            menuSettingFeature.attach(activity)
             attachLayoutProbe(activity)
             startPolling(activity)
             scheduleDump(activity, "resume")
         }
 
         override fun onActivityPaused(activity: Activity) {
-            if (activity.packageName == STEAM_PACKAGE) settingsDemoFeature.detach(activity)
+            if (activity.packageName == STEAM_PACKAGE) {
+                moduleSettingFeature.detach(activity)
+                menuSettingFeature.detach(activity)
+                floatingPanelFeature.detach(activity)
+            }
             stopPolling(activity)
         }
 
@@ -159,7 +173,11 @@ internal class SteamUiProbeFeature(
         ) = Unit
 
         override fun onActivityDestroyed(activity: Activity) {
-            if (activity.packageName == STEAM_PACKAGE) settingsDemoFeature.detach(activity)
+            if (activity.packageName == STEAM_PACKAGE) {
+                moduleSettingFeature.detach(activity)
+                menuSettingFeature.detach(activity)
+                floatingPanelFeature.detach(activity)
+            }
             val state = activityStates.remove(activity) ?: return
             stopPolling(state)
             state.decorView.viewTreeObserver.removeOnGlobalLayoutListener(state.listener)
@@ -253,7 +271,7 @@ internal class SteamUiProbeFeature(
         if (output.size >= MAX_NODES || depth > MAX_DEPTH) return
         if (view.visibility != View.VISIBLE || view.alpha <= 0f) return
 
-        if (view is WebView) settingsDemoFeature.observe(view)
+        if (view is WebView) floatingPanelFeature.observe(view)
 
         val attributes = semanticAttributes(view)
         val bounds = Rect()

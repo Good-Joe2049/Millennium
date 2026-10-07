@@ -39,10 +39,10 @@ import java.util.WeakHashMap
 import kotlin.math.min
 
 /**
- * In-window floating entry and same-container settings panel demo.
+ * In-window floating entry and same-container SteamDB panel.
  * The root is attached to the current Activity instead of a system window.
  */
-internal class SteamSettingsDemoFeature(
+internal class SteamFloatingPanelFeature(
     private val emit: (priority: Int, message: String) -> Unit,
 ) {
     private val steamDbPanelController = SteamDbPanelController(emit)
@@ -65,16 +65,19 @@ internal class SteamSettingsDemoFeature(
         }
         emit(
             Log.INFO,
-            "settings demo module APK resource path updated available=${!moduleApkPath.isNullOrBlank()} " +
+            "floating panel module APK resource path updated available=${!moduleApkPath.isNullOrBlank()} " +
                     "path=$moduleApkPath",
         )
     }
+
+    fun moduleIcon(activity: Activity): Drawable? = loadIcon(activity)
 
     fun attach(activity: Activity) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post { attach(activity) }
             return
         }
+        if (activity.isFinishing || activity.isDestroyed || !SteamModuleSettings.isSteamDbEnabled(activity)) return
         val decor = activity.window?.decorView as? ViewGroup ?: return
         val current = floatingStates[activity]
         if (current != null && current.root.parent === decor) return
@@ -147,13 +150,21 @@ internal class SteamSettingsDemoFeature(
             val params = state.card.layoutParams as? FrameLayout.LayoutParams
             emit(
                 Log.INFO,
-                "settings demo floating layout root=${root.width}x${root.height} " +
+                "floating layout root=${root.width}x${root.height} " +
                         "card=${state.card.width}x${state.card.height} " +
                         "left=${params?.leftMargin} top=${params?.topMargin} " +
                         "bubble=${state.bubble.javaClass.name} clickable=${state.bubble.isClickable}",
             )
         }
-        emit(Log.INFO, "settings demo floating bubble attached activity=${activity.javaClass.name}")
+        emit(Log.INFO, "floating bubble attached activity=${activity.javaClass.name}")
+    }
+
+    fun hideAll() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { hideAll() }
+            return
+        }
+        floatingStates.keys.toList().forEach(::detach)
     }
 
     fun detach(activity: Activity) {
@@ -166,10 +177,11 @@ internal class SteamSettingsDemoFeature(
         if (!state.expanded) saveBubblePosition(state)
         state.animator?.cancel()
         (state.root.parent as? ViewGroup)?.removeView(state.root)
-        emit(Log.DEBUG, "settings demo floating bubble detached activity=${activity.javaClass.name}")
+        emit(Log.DEBUG, "floating bubble detached activity=${activity.javaClass.name}")
     }
 
     fun observe(webView: WebView) {
+        if (!SteamModuleSettings.isSteamDbEnabled(webView.context)) return
         val url = webView.url.orEmpty()
         steamDbPanelController.observe(webView)
         if (observedUrls[webView] == url) return
@@ -177,31 +189,31 @@ internal class SteamSettingsDemoFeature(
         val host = runCatching { url.toUri().host?.lowercase() }.getOrNull()
         emit(
             Log.DEBUG,
-            "settings demo observe webView=${identity(webView)} url=${shorten(url)} " +
+            "floating panel observe webView=${identity(webView)} url=${shorten(url)} " +
                     "host=${host ?: "none"} js=${webView.settings.javaScriptEnabled}",
         )
         if (host == STORE_STEAM_HOST) {
-            emit(Log.DEBUG, "settings demo store page observed; friend activity script skipped")
+            emit(Log.DEBUG, "floating panel store page observed; friend activity script skipped")
             return
         }
         if (host != STEAM_COMMUNITY_HOST && host != "www.$STEAM_COMMUNITY_HOST") {
-            emit(Log.DEBUG, "settings demo skip: unsupported host=${host ?: "none"}")
+            emit(Log.DEBUG, "floating panel skip: unsupported host=${host ?: "none"}")
             return
         }
         if (webView.settings.javaScriptEnabled.not()) {
-            emit(Log.WARN, "settings demo skip: JavaScript is disabled")
+            emit(Log.WARN, "floating panel skip: JavaScript is disabled")
             return
         }
         val activity = webView.context.findActivity()
         if (activity == null) {
-            emit(Log.WARN, "settings demo skip: WebView context has no Activity")
+            emit(Log.WARN, "floating panel skip: WebView context has no Activity")
             return
         }
         if (hookedWebViews.put(webView, true) == null) {
             webView.addJavascriptInterface(Bridge(this), BRIDGE_NAME)
             emit(
                 Log.INFO,
-                "settings demo bridge attached webView=${identity(webView)} " +
+                "floating panel bridge attached webView=${identity(webView)} " +
                         "activity=${activity.javaClass.name}",
             )
         }
@@ -213,7 +225,7 @@ internal class SteamSettingsDemoFeature(
         // Retrying here also handles profile navigation without relying on text.
         mainHandler.post {
             if (activity.isFinishing || activity.isDestroyed) {
-                emit(Log.WARN, "settings demo skip injection: Activity is finishing/destroyed")
+                emit(Log.WARN, "floating panel skip injection: Activity is finishing/destroyed")
                 return@post
             }
             inject(webView, url)
@@ -221,18 +233,18 @@ internal class SteamSettingsDemoFeature(
     }
 
     private fun inject(webView: WebView, url: String) {
-        emit(Log.DEBUG, "settings demo injecting webView=${identity(webView)} url=${shorten(url)}")
+        emit(Log.DEBUG, "floating panel injecting webView=${identity(webView)} url=${shorten(url)}")
         runCatching {
             webView.evaluateJavascript(INSTALL_SCRIPT) { result ->
                 emit(
                     Log.INFO,
-                    "settings demo injection result webView=${identity(webView)} result=$result",
+                    "floating panel injection result webView=${identity(webView)} result=$result",
                 )
             }
         }.onFailure {
             emit(
                 Log.ERROR,
-                "settings demo injection failed webView=${identity(webView)} " +
+                "floating panel injection failed webView=${identity(webView)} " +
                         "error=${it.javaClass.name}: ${it.message}",
             )
         }
@@ -240,14 +252,14 @@ internal class SteamSettingsDemoFeature(
 
     private fun installBubbleTouch(state: FloatingState) {
         state.bubble.setOnClickListener {
-            emit(Log.INFO, "settings demo floating click callback expanded=${state.expanded}")
+            emit(Log.INFO, "floating click callback expanded=${state.expanded}")
             expand(state)
         }
         state.bubble.setOnTouchListener { view, event ->
             val wasDragging = state.dragging
             val handled = handleBubbleTouch(state, event)
             if (event.actionMasked == MotionEvent.ACTION_UP && !wasDragging) {
-                emit(Log.INFO, "settings demo floating touch tap performClick")
+                emit(Log.INFO, "floating touch tap performClick")
                 view.performClick()
             }
             handled
@@ -256,7 +268,7 @@ internal class SteamSettingsDemoFeature(
 
     private fun handleBubbleTouch(state: FloatingState, event: MotionEvent): Boolean {
         if (state.expanded) {
-            emit(Log.DEBUG, "settings demo floating touch ignored expanded=true action=${event.actionMasked}")
+            emit(Log.DEBUG, "floating touch ignored expanded=true action=${event.actionMasked}")
             return false
         }
         val slop = ViewConfiguration.get(state.activity).scaledTouchSlop.toFloat()
@@ -269,7 +281,7 @@ internal class SteamSettingsDemoFeature(
                 state.dragging = false
                 emit(
                     Log.INFO,
-                    "settings demo floating touch down raw=${event.rawX},${event.rawY} " +
+                    "floating touch down raw=${event.rawX},${event.rawY} " +
                             "left=${state.startLeft} top=${state.startTop} slop=$slop",
                 )
                 true
@@ -279,7 +291,7 @@ internal class SteamSettingsDemoFeature(
                 val dy = event.rawY - state.downY
                 if (!state.dragging && dx * dx + dy * dy > slop * slop) {
                     state.dragging = true
-                    emit(Log.INFO, "settings demo floating drag started dx=$dx dy=$dy")
+                    emit(Log.INFO, "floating drag started dx=$dx dy=$dy")
                 }
                 if (state.dragging) moveBubble(state, state.startLeft + dx.toInt(), state.startTop + dy.toInt())
                 true
@@ -290,17 +302,17 @@ internal class SteamSettingsDemoFeature(
                     snapBubble(state)
                     emit(
                         Log.INFO,
-                        "settings demo floating touch up drag left=${state.bubbleLeft} top=${state.bubbleTop}",
+                        "floating touch up drag left=${state.bubbleLeft} top=${state.bubbleTop}",
                     )
                 } else {
-                    emit(Log.INFO, "settings demo floating touch up tap")
+                    emit(Log.INFO, "floating touch up tap")
                 }
                 state.dragging = false
                 true
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (state.dragging) snapBubble(state)
-                emit(Log.INFO, "settings demo floating touch cancel dragging=${state.dragging}")
+                emit(Log.INFO, "floating touch cancel dragging=${state.dragging}")
                 state.dragging = false
                 true
             }
@@ -411,7 +423,7 @@ internal class SteamSettingsDemoFeature(
         state.sharedIcon.invalidate()
         emit(
             Log.INFO,
-            "settings demo shared icon view refreshed " +
+            "floating panel shared icon view refreshed " +
                     "drawable=${drawable?.javaClass?.name ?: "none"}",
         )
         state.card.post { logIconLayout(state, "refreshed") }
@@ -428,7 +440,7 @@ internal class SteamSettingsDemoFeature(
         val drawable = icon.drawable
         emit(
             Log.INFO,
-            "settings demo shared icon view phase=$phase " +
+            "floating panel shared icon view phase=$phase " +
                     "visible=$visible visibility=${icon.visibility} alpha=${icon.alpha} " +
                     "size=${icon.width}x${icon.height} " +
                     "margin=${params?.leftMargin ?: 0},${params?.topMargin ?: 0} " +
@@ -465,7 +477,7 @@ internal class SteamSettingsDemoFeature(
         val endHeight = if (opening) panelHeight else bubbleSize
         emit(
             Log.INFO,
-            "settings demo icon transform start=${if (opening) "expand" else "collapse"} " +
+            "floating panel icon transform start=${if (opening) "expand" else "collapse"} " +
                     "card=${startWidth}x${startHeight}@${startLeft},${startTop} " +
                     "target=${endWidth}x${endHeight}@${endLeft},${endTop}",
         )
@@ -515,14 +527,14 @@ internal class SteamSettingsDemoFeature(
                         state.sharedIcon.alpha = 1f
                         state.panel.alpha = 1f
                         state.card.post { logIconLayout(state, "expand-end") }
-                        emit(Log.INFO, "settings demo floating panel shown width=$panelWidth height=$panelHeight")
+                        emit(Log.INFO, "floating panel shown width=$panelWidth height=$panelHeight")
                     } else {
                         state.panel.visibility = View.GONE
                         state.scrim.visibility = View.GONE
                         state.scrim.isClickable = false
                         state.sharedIcon.alpha = 1f
                         state.card.post { logIconLayout(state, "collapse-end") }
-                        emit(Log.INFO, "settings demo floating panel collapsed")
+                        emit(Log.INFO, "floating panel collapsed")
                     }
                 }
             })
@@ -542,7 +554,7 @@ internal class SteamSettingsDemoFeature(
         tag = SHARED_ICON_TAG
         contentDescription = "Millennium"
         setImageDrawable(drawable)
-        imageTintList = ColorStateList.valueOf(Color.WHITE)
+        imageTintList = ColorStateList.valueOf(SteamDbUi.TEXT)
         background = GradientDrawable().apply {
             setColor(Color.TRANSPARENT)
             cornerRadius = dp(activity, 8).toFloat()
@@ -576,7 +588,7 @@ internal class SteamSettingsDemoFeature(
     private fun moduleResources(activity: Activity): Resources? {
         val path = moduleApkPath
         if (path.isNullOrBlank()) {
-            emit(Log.WARN, "settings demo module APK resource path unavailable")
+            emit(Log.WARN, "floating panel module APK resource path unavailable")
             return null
         }
         synchronized(moduleResourcesLock) {
@@ -590,7 +602,7 @@ internal class SteamSettingsDemoFeature(
             } catch (error: Throwable) {
                 emit(
                     Log.ERROR,
-                    "settings demo module AssetManager creation failed path=$path " +
+                    "floating panel module AssetManager creation failed path=$path " +
                             "error=${error.javaClass.simpleName}:${error.message}",
                 )
                 return null
@@ -606,13 +618,13 @@ internal class SteamSettingsDemoFeature(
             } catch (error: Throwable) {
                 emit(
                     Log.ERROR,
-                    "settings demo module APK asset path failed path=$path " +
+                    "floating panel module APK asset path failed path=$path " +
                             "error=${error.javaClass.simpleName}:${error.message}",
                 )
                 0
             }
             if (cookie == 0) {
-                emit(Log.ERROR, "settings demo module APK asset path rejected path=$path")
+                emit(Log.ERROR, "floating panel module APK asset path rejected path=$path")
                 return null
             }
             val resources = Resources(
@@ -621,7 +633,7 @@ internal class SteamSettingsDemoFeature(
                 activity.resources.configuration,
             )
             moduleResourcesBundle = ModuleResourcesBundle(path, resources)
-            emit(Log.INFO, "settings demo module APK resources loaded path=$path cookie=$cookie")
+            emit(Log.INFO, "floating panel module APK resources loaded path=$path cookie=$cookie")
             return resources
         }
     }
@@ -636,14 +648,14 @@ internal class SteamSettingsDemoFeature(
         }.onFailure { error ->
             emit(
                 Log.ERROR,
-                "settings demo shared icon load failed source=moduleApk " +
+                "floating panel shared icon load failed source=moduleApk " +
                         "path=$moduleApkPath resourceId=0x${resourceId.toString(16)} " +
                         "error=${error.javaClass.simpleName}:${error.message}",
             )
         }.getOrNull()?.also {
             emit(
                 Log.INFO,
-                "settings demo shared icon resource loaded source=moduleApk " +
+                "floating panel shared icon resource loaded source=moduleApk " +
                         "path=$moduleApkPath resourceId=0x${resourceId.toString(16)}",
             )
         }
@@ -671,7 +683,7 @@ internal class SteamSettingsDemoFeature(
             ) {
                 Log.i(
                     "MillenniumSteamUI",
-                    "settings demo floating dispatch tag=$tag action=${event.actionMasked} " +
+                    "floating dispatch tag=$tag action=${event.actionMasked} " +
                             "x=${event.rawX} y=${event.rawY} clickable=$isClickable enabled=$isEnabled",
                 )
             }
@@ -718,21 +730,21 @@ internal class SteamSettingsDemoFeature(
     }
 
     private class Bridge(
-        private val feature: SteamSettingsDemoFeature,
+        private val feature: SteamFloatingPanelFeature,
     ) {
         @JavascriptInterface
         @Suppress("unused")
         fun logEvent(message: String) {
-            feature.emit(Log.INFO, "settings demo JS: ${shorten(message)}")
+            feature.emit(Log.INFO, "floating panel JS: ${shorten(message)}")
         }
     }
 
     private companion object {
         const val BRIDGE_NAME = "MillenniumBridge"
-        const val ROOT_TAG = "millennium.settings.demo.root"
-        const val CARD_TAG = "millennium.settings.demo.card"
-        const val BUBBLE_TAG = "millennium.settings.demo.bubble"
-        const val SHARED_ICON_TAG = "millennium.settings.demo.shared-icon"
+        const val ROOT_TAG = "millennium.floating.panel.root"
+        const val CARD_TAG = "millennium.floating.panel.card"
+        const val BUBBLE_TAG = "millennium.floating.panel.bubble"
+        const val SHARED_ICON_TAG = "millennium.floating.panel.shared-icon"
         const val STEAM_COMMUNITY_HOST = "steamcommunity.com"
         const val STORE_STEAM_HOST = "store.steampowered.com"
         const val BUBBLE_SIZE_DP = 42

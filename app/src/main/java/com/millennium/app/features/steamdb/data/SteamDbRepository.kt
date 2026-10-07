@@ -1,6 +1,5 @@
 package com.millennium.app.features.steamdb.data
 
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -26,10 +25,9 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
         prices.invalidate { it.first == appId }
     }
 
-    fun appInfo(context: Context, appId: Int, callback: (Result<SteamDbAppInfo>) -> Unit) {
-        val appContext = context.applicationContext
+    fun appInfo(appId: Int, callback: (Result<SteamDbAppInfo>) -> Unit) {
         apps.load(appId, {
-            val data = steamDbData(appContext, "steamdb", "ExtensionApp/?appid=$appId")
+            val data = steamDbData("steamdb", "ExtensionApp/?appid=$appId")
             emit(Log.DEBUG, "steamdb data fields received source=steamdb appId=$appId " +
                     "cp=${data.opt("cp")} mdp=${data.opt("mdp")} mp=${data.opt("mp")} f=${data.opt("f")} u=${data.opt("u")}")
             SteamDbAppInfo(
@@ -38,11 +36,10 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
         }, callback)
     }
 
-    fun lowestPrice(context: Context, appId: Int, currency: String, callback: (Result<SteamDbLowestPrice>) -> Unit) {
-        val appContext = context.applicationContext
+    fun lowestPrice(appId: Int, currency: String, callback: (Result<SteamDbLowestPrice>) -> Unit) {
         prices.load(appId to currency, {
             val encoded = URLEncoder.encode(currency, "UTF-8")
-            val data = steamDbData(appContext, "steamdb-price", "ExtensionAppPrice/?appid=$appId&currency=$encoded")
+            val data = steamDbData("steamdb-price", "ExtensionAppPrice/?appid=$appId&currency=$encoded")
             val price = data.optString("p").takeIf { it.isNotBlank() && it != "null" }
                 ?: throw IOException("SteamDB price response missing p")
             SteamDbLowestPrice(
@@ -56,11 +53,10 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
         }, callback)
     }
 
-    fun currentPlayers(context: Context, appId: Int, callback: (Result<Int>) -> Unit) {
-        val appContext = context.applicationContext
+    fun currentPlayers(appId: Int, callback: (Result<Int>) -> Unit) {
         players.load(appId, {
             val response = http.get(
-                appContext, "steam-current-players",
+                "steam-current-players",
                 "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/" +
                         "?origin=https%3A%2F%2Fstore.steampowered.com&appid=$appId",
             ).optJSONObject("response") ?: throw IOException("Steam response missing response")
@@ -69,8 +65,8 @@ internal class SteamDbRepository(private val emit: (Int, String) -> Unit) {
         }, callback)
     }
 
-    private fun steamDbData(context: Context, source: String, path: String): JSONObject {
-        val response = http.get(context, source, "https://extension.steamdb.info/api/$path")
+    private fun steamDbData(source: String, path: String): JSONObject {
+        val response = http.get(source, "https://extension.steamdb.info/api/$path")
         if (!response.optBoolean("success")) {
             emit(Log.WARN, "steamdb data API unsuccessful source=$source path=$path success=${response.opt("success")}")
             throw IOException("SteamDB success=false")

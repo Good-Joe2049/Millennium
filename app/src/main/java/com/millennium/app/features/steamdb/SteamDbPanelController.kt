@@ -68,7 +68,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
         emit(Log.INFO, "steamdb panel request appId=$appId generation=$generation refresh=$force")
 
         // One ExtensionApp response feeds both online stats and last update.
-        repository.appInfo(activity, appId) { result ->
+        repository.appInfo(appId) { result ->
             if (!isCurrent(activity, panel, webView, appId, generation)) return@appInfo
             panel.online.showAppInfo(result)
             panel.update.show(result)
@@ -76,7 +76,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
             panel.finish("app", result.isSuccess)
             logResult("app-info", appId, result)
         }
-        repository.currentPlayers(activity, appId) { result ->
+        repository.currentPlayers(appId) { result ->
             if (!isCurrent(activity, panel, webView, appId, generation)) return@currentPlayers
             panel.online.showCurrentPlayers(result)
             panel.finish("players", result.isSuccess)
@@ -106,7 +106,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
                         currency != null -> {
                             panel.priceRequested = true
                             panel.pending.add("price")
-                            repository.lowestPrice(activity, appId, currency) { price ->
+                            repository.lowestPrice(appId, currency) { price ->
                                 if (!isCurrent(activity, panel, webView, appId, generation)) return@lowestPrice
                                 panel.price.show(price)
                                 panel.finish("price", price.isSuccess)

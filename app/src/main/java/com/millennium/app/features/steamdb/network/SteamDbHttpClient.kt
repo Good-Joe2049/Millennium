@@ -1,6 +1,5 @@
 package com.millennium.app.features.steamdb.network
 
-import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import org.json.JSONObject
@@ -11,32 +10,32 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicLong
 
-/** Shared JSON requests. HTTP rejection is never retried through another transport. */
+/** Shared JSON requests over HttpURLConnection. */
 internal class SteamDbHttpClient(private val emit: (Int, String) -> Unit) {
-    private val cronet = SteamDbCronetTransport(emit)
     private val steamDbRetryAt = AtomicLong()
 
-    fun get(context: Context, source: String, endpoint: String): JSONObject {
+    fun get(source: String, endpoint: String): JSONObject {
         val steamDb = URL(endpoint).host == "extension.steamdb.info"
         if (steamDb && SystemClock.elapsedRealtime() < steamDbRetryAt.get()) {
             emit(Log.WARN, "steamdb network rate limited source=$source endpoint=$endpoint")
             throw IOException("SteamDB rate limited; waiting for Retry-After")
         }
-        val started = SystemClock.elapsedRealtime()
-        emit(Log.DEBUG, "steamdb network http start source=$source endpoint=$endpoint")
+        val trace = SteamDbRequestTrace(source, emit)
+        trace.log(Log.INFO, "http start", "endpoint=$endpoint transport=http-url-connection")
         val headers = requestHeaders(steamDb)
         val response = try {
-            cronet.get(context, endpoint, headers) ?: urlConnection(endpoint, headers)
+            trace.withNetworkTracing { urlConnection(endpoint, headers, trace) }
         } catch (error: IOException) {
-            emit(Log.ERROR, "steamdb network failure source=$source endpoint=$endpoint error=$error")
+            trace.log(Log.ERROR, "failure", "endpoint=$endpoint elapsedMs=${trace.elapsedMs} error=${Log.getStackTraceString(error)}")
             throw error
         }
-        emit(
+        trace.log(
             Log.INFO,
-            "steamdb network http response source=$source transport=${response.transport} " +
+            "http response",
+            "transport=http-url-connection " +
                     "status=${response.status} contentType=${response.header("Content-Type")} " +
                     "server=${response.header("Server")} retryAfter=${response.header("Retry-After")} " +
-                    "elapsedMs=${SystemClock.elapsedRealtime() - started}",
+                    "elapsedMs=${trace.elapsedMs}",
         )
         if (steamDb && response.status == 429) {
             val delay = retryDelayMillis(response.header("Retry-After"))
@@ -44,36 +43,59 @@ internal class SteamDbHttpClient(private val emit: (Int, String) -> Unit) {
         }
         val preview = response.body.replace('\n', ' ').replace('\r', ' ').take(240).ifBlank { "<empty>" }
         if (response.status !in 200..299) {
-            emit(Log.WARN, "steamdb network interface rejected source=$source status=${response.status} bodyPreview=$preview")
+            trace.log(Log.WARN, "interface rejected", "status=${response.status} bodyPreview=$preview")
             throw IOException("HTTP ${response.status}")
         }
-        emit(Log.DEBUG, "steamdb network http body source=$source length=${response.body.length} preview=$preview")
+        trace.log(Log.DEBUG, "http body", "length=${response.body.length} preview=$preview")
         return try {
-            JSONObject(response.body)
+            trace.measure("json_parse") { JSONObject(response.body) }
         } catch (error: org.json.JSONException) {
-            emit(Log.ERROR, "steamdb network JSON parse failed source=$source bodyPreview=$preview error=$error")
+            trace.log(Log.ERROR, "JSON parse failed", "bodyPreview=$preview error=$error")
             throw IOException("Invalid JSON from $source", error)
         }
     }
 
-    private fun urlConnection(endpoint: String, headers: Map<String, String>): SteamDbHttpResponse {
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-            headers.forEach { (name, value) -> setRequestProperty(name, value) }
+    private fun urlConnection(
+        endpoint: String,
+        headers: Map<String, String>,
+        trace: SteamDbRequestTrace,
+    ): SteamDbHttpResponse {
+        val connection = trace.measure("open_connection") {
+            (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                headers.forEach { (name, value) -> setRequestProperty(name, value) }
+            }
         }
         return try {
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            trace.log(
+                Log.INFO,
+                "http config",
+                "connectTimeoutMs=${connection.connectTimeout} readTimeoutMs=${connection.readTimeout} " +
+                        "implementation=${connection.javaClass.name} connectScope=dns+tcp+tls-or-reuse",
+            )
+            // This phase records the explicit setup call; the platform may defer some work until
+            // responseCode, so a lazy DNS/TCP/TLS delay can instead appear in response_headers.
+            trace.measure("connect") { connection.connect() }
+            // Automatic redirects or retries can also reconnect while fetching response headers.
+            val status = trace.measure("response_headers") { connection.responseCode }
+            trace.log(
+                Log.INFO,
+                "http headers",
+                "status=$status finalHost=${connection.url.host} " +
+                        "redirected=${connection.url.toExternalForm() != endpoint}",
+            )
+            val body = trace.measure("response_body") {
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            }
             SteamDbHttpResponse(
                 status, body,
                 connection.headerFields.filterKeys { it != null }.mapKeys { it.key!! },
-                "http-url-connection",
             )
         } finally {
-            connection.disconnect()
+            trace.measure("disconnect") { connection.disconnect() }
         }
     }
 
@@ -107,17 +129,16 @@ internal class SteamDbHttpClient(private val emit: (Int, String) -> Unit) {
     }
 
     companion object {
-        const val TIMEOUT_MS = 8_000
-        const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        private const val TIMEOUT_MS = 8_000
+        private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
     }
 }
 
-internal data class SteamDbHttpResponse(
+private data class SteamDbHttpResponse(
     val status: Int,
     val body: String,
     val headers: Map<String, List<String>>,
-    val transport: String,
 ) {
     fun header(name: String): String = headers.entries
         .firstOrNull { it.key.equals(name, ignoreCase = true) }?.value?.firstOrNull() ?: "unknown"
