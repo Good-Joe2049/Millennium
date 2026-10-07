@@ -28,9 +28,10 @@
 
 </div>
 
-<p align="center">
-  <img src="./docs/images/millennium-website-preview.png" width="100%" alt="Millennium 网站界面预览" />
-</p>
+<div align="center">
+  <img src="./docs/images/millennium-website-preview.png" height="420" alt="Millennium 网站界面预览" />&nbsp;&nbsp;&nbsp;
+  <img src="./docs/images/steam-menu-preview.jpg" height="420" alt="Steam 菜单中的 Millennium 入口" />
+</div>
 
 ---
 
