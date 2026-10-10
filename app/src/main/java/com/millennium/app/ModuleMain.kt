@@ -1,33 +1,28 @@
 package com.millennium.app
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Rect
-import android.util.Base64
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.widget.Toast
 import com.millennium.app.core.SteamRuntimeDiagnostics
 import com.millennium.app.features.steamdb.network.SteamDbConnectionDiagnostics
+import com.millennium.app.features.steamguard.data.SteamGuardStorageHook
 import com.millennium.app.features.ui.SteamUiProbeFeature
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
-import org.json.JSONObject
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
-/** Built-in Steam Guard export feature matching SteamGuardDump's startup trigger. */
+/** Installs the module features in Steam. */
 class ModuleMain : XposedModule() {
     private var loadedProcess = "unknown"
     private var moduleApkPath: String? = null
 
     companion object {
         private const val TAG = "MillenniumXposed"
-        private const val GUARD_TAG = "MillenniumSteamGuard"
         private const val STEAM_PACKAGE = "com.valvesoftware.android.steam.community"
         private const val MAIN_APPLICATION = "com.valvesoftware.android.steam.community.MainApplication"
         private const val REACT_INSTANCE_MANAGER = "com.facebook.react.ReactInstanceManager"
@@ -39,14 +34,6 @@ class ModuleMain : XposedModule() {
         private const val REACT_TOUCH_TARGET_HELPER =
             "com.facebook.react.uimanager.TouchTargetHelper"
         private const val JS_BUNDLE_LOADER = "com.facebook.react.bridge.JSBundleLoader"
-        private const val EXPORTED_MODULE = "expo.modules.core.ExportedModule"
-        private val SECURE_STORE_ENCRYPTERS = listOf(
-            "expo.modules.securestore.SecureStoreModule" + '$' + "HybridAESEncrypter",
-            "expo.modules.securestore.SecureStoreModule" + '$' + "AESEncrypter",
-            "expo.modules.securestore.SecureStoreModule" + '$' + "LegacySDK20Encrypter",
-            "expo.modules.securestore.encryptors.AESEncryptor",
-            "expo.modules.securestore.encryptors.HybridAESEncryptor",
-        )
         private const val SETUP_HOOK_ID = "millennium.probe.setup-react-context"
         private const val APPLICATION_HOOK_ID = "millennium.probe.application-on-create"
         private const val LOAD_BUNDLE_HOOK_ID = "millennium.probe.react-instance-load-bundle"
@@ -66,23 +53,13 @@ class ModuleMain : XposedModule() {
         log(priority, tag, message)
     }
 
-    private val hookedPromiseClasses = hashSetOf<Class<*>>()
-    private var targetPromise: Any? = null
+    private val steamGuardStorageHook = SteamGuardStorageHook(this) { steamContext }
     private var lastTouchTargetLogKey: String? = null
     private var lastTouchTargetLogAt = 0L
-
-    private fun guardLog(priority: Int, message: String, throwable: Throwable? = null) {
-        if (throwable == null) {
-            log(priority, GUARD_TAG, message)
-        } else {
-            log(priority, GUARD_TAG, message, throwable)
-        }
-    }
 
     override fun onModuleLoaded(param: XposedModuleInterface.ModuleLoadedParam) {
         loadedProcess = param.processName
         log(Log.INFO, TAG, "loaded process=$loadedProcess framework=$frameworkName/$frameworkVersion api=$apiVersion")
-        guardLog(Log.INFO, "module loaded process=$loadedProcess")
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
@@ -98,7 +75,6 @@ class ModuleMain : XposedModule() {
             "module APK path available=${!moduleApkPath.isNullOrBlank()} path=$moduleApkPath",
         )
         log(Log.INFO, TAG, "Steam package ready process=$loadedProcess loader=${param.classLoader}")
-        guardLog(Log.INFO, "feature entry package=${param.packageName}")
 
         runCatching {
             SteamDbConnectionDiagnostics.install(this, param.classLoader) { priority, message ->
@@ -129,8 +105,8 @@ class ModuleMain : XposedModule() {
         runCatching { hookActivityTouchDispatch() }
             .onFailure { log(Log.ERROR, TAG, "Activity touch probe hook failed", it) }
 
-        runCatching { hookSteamGuardStorage(param.classLoader) }
-            .onFailure { guardLog(Log.ERROR, "storage hook failed", it) }
+        runCatching { steamGuardStorageHook.install(param.classLoader) }
+            .onFailure { log(Log.ERROR, "MillenniumSteamGuard", "storage hook failed", it) }
 
     }
 
@@ -196,7 +172,7 @@ class ModuleMain : XposedModule() {
 
     private fun hookReactTouchTargetResolution(classLoader: ClassLoader) {
         val helper = Class.forName(REACT_TOUCH_TARGET_HELPER, false, classLoader)
-        val methods = findMethodsNamed(helper, "findTargetTagAndCoordinatesForTouch")
+        val methods = findTouchTargetMethods(helper)
         if (methods.isEmpty()) {
             log(Log.WARN, TAG, "React touch target hook found no target resolver methods")
             return
@@ -336,161 +312,18 @@ class ModuleMain : XposedModule() {
             }
     }
 
-    private fun hookSteamGuardStorage(classLoader: ClassLoader) {
-        var decryptHookCount = 0
-        var exportedHookCount = 0
-        SECURE_STORE_ENCRYPTERS.forEach { className ->
-            val encrypter = runCatching { Class.forName(className, false, classLoader) }.getOrNull() ?: return@forEach
-            findMethodsNamed(encrypter, "decryptItem")
-                .forEachIndexed { index, method ->
-                    hook(method)
-                        .setId("millennium.feature.steam-guard.decrypt.$decryptHookCount.$index")
-                        .intercept { chain ->
-                            val result = chain.proceed()
-                            if (result is String && isSteamGuardRead()) captureSteamGuard(result, "decryptItem")
-                            result
-                        }
-                    decryptHookCount++
-                }
-        }
-
-        val exportedModule = runCatching {
-            Class.forName(EXPORTED_MODULE, false, classLoader)
-        }.getOrNull()
-        if (exportedModule == null) {
-            guardLog(Log.DEBUG, "optional ExportedModule path not present; using decryptItem path")
-        } else {
-            findMethodsNamed(exportedModule, "invokeExportedMethod")
-                .forEachIndexed { index, method ->
-                    hook(method)
-                        .setId("millennium.feature.steam-guard.exported.$index")
-                        .intercept { chain ->
-                            captureSteamGuardPromise(chain.args)
-                            chain.proceed()
-                        }
-                    exportedHookCount++
-                }
-        }
-
-        guardLog(Log.INFO, "storage hooks installed decrypt=$decryptHookCount exported=$exportedHookCount")
-    }
-
-    private fun isSteamGuardRead(): Boolean {
-        return Throwable().stackTrace.any {
-            it.methodName == "readJSONEncodedItem" || it.methodName == "readLegacySDK20Item"
-        }
-    }
-
-    private fun captureSteamGuardPromise(args: List<*>) {
-        if (args.isEmpty() || args[0] != "getValueWithKeyAsync") return
-        val callArgs = args.getOrNull(1) as? Collection<*> ?: return
-        val key = callArgs.firstOrNull() as? String ?: return
-        if (!key.startsWith("SteamGuard")) return
-        guardLog(Log.DEBUG, "SteamGuard read request observed key=$key")
-        val promise = callArgs.elementAtOrNull(2) ?: return
-        targetPromise = promise
-        val promiseClass = promise.javaClass
-        synchronized(hookedPromiseClasses) {
-            if (!hookedPromiseClasses.add(promiseClass)) return
-        }
-        findMethodsNamed(promiseClass, "resolve")
-            .filter { it.parameterTypes.size == 1 }
-            .forEachIndexed { index, method ->
-                hook(method)
-                    .setId("millennium.feature.steam-guard.promise.${promiseClass.name}.$index")
-                    .intercept { chain ->
-                        val value = chain.args.firstOrNull()
-                        if (chain.thisObject === targetPromise && value is String) {
-                            captureSteamGuard(value, "promise.resolve")
-                        }
-                        chain.proceed()
-                    }
-            }
-        guardLog(Log.DEBUG, "SteamGuard promise hook installed class=${promiseClass.name}")
-    }
-
-    private fun findMethodsNamed(type: Class<*>, name: String): List<Method> {
+    private fun findTouchTargetMethods(type: Class<*>): List<Method> {
         val methods = linkedSetOf<Method>()
         var current: Class<*>? = type
         while (current != null) {
             current.declaredMethods
-                .filter { it.name == name && !Modifier.isAbstract(it.modifiers) }
+                .filter {
+                    it.name == "findTargetTagAndCoordinatesForTouch" && !Modifier.isAbstract(it.modifiers)
+                }
                 .forEach { methods += it }
             current = current.superclass
         }
         return methods.toList()
-    }
-
-    private fun captureSteamGuard(rawJson: String, source: String) {
-        val enhanced = runCatching { enhanceSteamGuardJson(rawJson, steamContext) }
-            .getOrElse {
-                guardLog(Log.WARN, "JSON enhancement failed; keeping original", it)
-                rawJson
-            }
-        copySteamGuardData(enhanced, source)
-    }
-
-    private fun enhanceSteamGuardJson(rawJson: String, context: Context?): String {
-        val steamGuard = JSONObject(rawJson)
-        val accounts = steamGuard.optJSONObject("accounts")
-        if (accounts != null) {
-            val keys = accounts.keys()
-            while (keys.hasNext()) {
-                val account = accounts.optJSONObject(keys.next()) ?: continue
-                if (account.optString("uri").isNotEmpty()) continue
-                val sharedSecret = account.optString("shared_secret")
-                if (sharedSecret.isEmpty()) continue
-                val decoded = Base64.decode(sharedSecret, Base64.DEFAULT)
-                val base32 = encodeBase32(decoded)
-                account.put(
-                    "uri",
-                    "otpauth://totp/Steam:${account.optString("account_name")}" +
-                            "?secret=$base32&issuer=Steam"
-                )
-            }
-        }
-        val uuid = context?.getSharedPreferences("steam.uuid", Context.MODE_PRIVATE)
-            ?.getString("uuidKey", null)
-        if (!uuid.isNullOrEmpty()) steamGuard.put("uuid_key", uuid)
-        return steamGuard.toString()
-    }
-
-    private fun encodeBase32(bytes: ByteArray): String {
-        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-        val output = StringBuilder((bytes.size * 8 + 4) / 5)
-        var buffer = 0
-        var bits = 0
-        bytes.forEach { byte ->
-            buffer = (buffer shl 8) or (byte.toInt() and 0xff)
-            bits += 8
-            while (bits >= 5) {
-                bits -= 5
-                output.append(alphabet[(buffer shr bits) and 0x1f])
-            }
-        }
-        if (bits > 0) output.append(alphabet[(buffer shl (5 - bits)) and 0x1f])
-        return output.toString()
-    }
-
-    private fun copySteamGuardData(data: String, source: String) {
-        val context = steamContext
-        if (context == null) {
-            guardLog(Log.ERROR, "copy skipped: Steam application context is unavailable source=$source")
-            return
-        }
-        if (data.isEmpty()) {
-            guardLog(Log.WARN, "copy skipped: empty SteamGuard data source=$source")
-            Toast.makeText(context, "SteamGuard data is not ready", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        if (clipboard == null) {
-            guardLog(Log.ERROR, "clipboard service unavailable")
-            return
-        }
-        clipboard.setPrimaryClip(ClipData.newPlainText("SteamGuard", data))
-        Toast.makeText(context, "SteamGuard data copied", Toast.LENGTH_SHORT).show()
-        guardLog(Log.INFO, "data copied immediately source=$source length=${data.length}")
     }
 
     private fun inspectBridgelessInstance(instance: Any?) {

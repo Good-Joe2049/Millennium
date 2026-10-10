@@ -13,6 +13,9 @@ import android.view.ViewTreeObserver
 import android.view.ViewParent
 import android.widget.TextView
 import android.webkit.WebView
+import com.millennium.app.features.ui.floating.SteamFloatingPanelFeature
+import com.millennium.app.features.ui.menu.SteamMainMenuSettingFeature
+import com.millennium.app.features.ui.settings.SteamModuleSettingFeature
 import java.util.IdentityHashMap
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +43,7 @@ internal class SteamUiProbeFeature(
 
     fun setModuleApkPath(path: String?) {
         floatingPanelFeature.setModuleApkPath(path)
+        moduleSettingFeature.setModuleApkPath(path)
     }
 
     @Synchronized
@@ -142,7 +146,11 @@ internal class SteamUiProbeFeature(
     }
 
     private val callbacks = object : Application.ActivityLifecycleCallbacks {
-        override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) = Unit
+        override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {
+            if (activity.packageName == STEAM_PACKAGE) {
+                moduleSettingFeature.restoreState(activity, savedInstanceState)
+            }
+        }
 
         override fun onActivityStarted(activity: Activity) = Unit
 
@@ -151,6 +159,7 @@ internal class SteamUiProbeFeature(
             touchInterceptionEnabled.set(false)
             floatingPanelFeature.attach(activity)
             menuSettingFeature.attach(activity)
+            moduleSettingFeature.resume(activity)
             attachLayoutProbe(activity)
             startPolling(activity)
             scheduleDump(activity, "resume")
@@ -158,7 +167,7 @@ internal class SteamUiProbeFeature(
 
         override fun onActivityPaused(activity: Activity) {
             if (activity.packageName == STEAM_PACKAGE) {
-                moduleSettingFeature.detach(activity)
+                // Keep the settings window and its selected tab while Steam is in the background.
                 menuSettingFeature.detach(activity)
                 floatingPanelFeature.detach(activity)
             }
@@ -170,7 +179,11 @@ internal class SteamUiProbeFeature(
         override fun onActivitySaveInstanceState(
             activity: Activity,
             outState: android.os.Bundle,
-        ) = Unit
+        ) {
+            if (activity.packageName == STEAM_PACKAGE) {
+                moduleSettingFeature.saveState(activity, outState)
+            }
+        }
 
         override fun onActivityDestroyed(activity: Activity) {
             if (activity.packageName == STEAM_PACKAGE) {

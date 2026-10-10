@@ -1,4 +1,4 @@
-package com.millennium.app.features.ui
+package com.millennium.app.features.ui.floating
 
 import android.graphics.Canvas
 import android.graphics.Color

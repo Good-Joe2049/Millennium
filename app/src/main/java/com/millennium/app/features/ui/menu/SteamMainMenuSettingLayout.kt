@@ -1,4 +1,4 @@
-package com.millennium.app.features.ui
+package com.millennium.app.features.ui.menu
 
 import android.content.Context
 import android.graphics.Rect

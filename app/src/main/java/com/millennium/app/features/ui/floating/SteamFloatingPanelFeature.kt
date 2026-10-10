@@ -1,4 +1,4 @@
-package com.millennium.app.features.ui
+package com.millennium.app.features.ui.floating
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -34,6 +34,7 @@ import androidx.core.net.toUri
 import androidx.core.content.res.ResourcesCompat
 import com.millennium.app.R
 import com.millennium.app.features.steamdb.SteamDbPanelController
+import com.millennium.app.features.ui.settings.SteamModuleSettings
 import java.util.IdentityHashMap
 import java.util.WeakHashMap
 import kotlin.math.min
