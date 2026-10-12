@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Good-Joe2049/Millennium/releases">
+  <a href="https://github.com/Good-Joe2049/Millennium/releases/latest">
     <img src="https://img.shields.io/github/v/release/Good-Joe2049/Millennium?style=for-the-badge&amp;label=%E4%B8%8B%E8%BD%BD%20APK&amp;logo=github" alt="从 GitHub 下载最新 APK">
   </a>
 </p>
