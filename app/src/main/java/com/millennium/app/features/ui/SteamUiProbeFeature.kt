@@ -1,5 +1,8 @@
 package com.millennium.app.features.ui
 
+import com.millennium.app.core.ModuleLocalization
+import com.millennium.app.features.ui.settings.SteamModuleSettings
+
 import android.app.Activity
 import android.app.Application
 import android.content.Context
@@ -29,7 +32,13 @@ internal class SteamUiProbeFeature(
     private val activityStates = IdentityHashMap<Activity, ActivityState>()
     private val reactNativeTagIdsByLoader = WeakHashMap<ClassLoader, Map<String, Int>>()
     private val floatingPanelFeature = SteamFloatingPanelFeature(emit)
-    private val moduleSettingFeature = SteamModuleSettingFeature(emit) { activity, enabled ->
+    private val moduleSettingFeature = SteamModuleSettingFeature(
+        emit = emit,
+        onLanguageChanged = { activity ->
+            floatingPanelFeature.detach(activity)
+            floatingPanelFeature.attach(activity)
+        },
+    ) { activity, enabled ->
         if (enabled) floatingPanelFeature.attach(activity)
         else floatingPanelFeature.hideAll()
     }
@@ -42,6 +51,7 @@ internal class SteamUiProbeFeature(
     private val touchInterceptionEnabled = AtomicBoolean(false)
 
     fun setModuleApkPath(path: String?) {
+        ModuleLocalization.setModuleApkPath(path)
         floatingPanelFeature.setModuleApkPath(path)
         moduleSettingFeature.setModuleApkPath(path)
     }
@@ -50,6 +60,7 @@ internal class SteamUiProbeFeature(
     fun install(context: Context?) {
         val application = context?.applicationContext as? Application ?: return
         if (installedApplications.put(application, true) != null) return
+        ModuleLocalization.language = SteamModuleSettings.language(application)
         application.registerActivityLifecycleCallbacks(callbacks)
         emit(Log.INFO, "probe installed package=${application.packageName}")
     }

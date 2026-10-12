@@ -1,5 +1,7 @@
 package com.millennium.app.features.ui.settings
 
+import com.millennium.app.core.ModuleLanguage
+
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -36,6 +38,7 @@ internal fun SteamModuleSettingNavigation(
     onSteamDbEnabledChange: (Boolean) -> Unit,
     liquidGlassEnabled: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
+    onLanguageChange: (ModuleLanguage) -> Unit,
     onRequestClose: () -> Unit,
     onClosed: () -> Unit,
 ) {
@@ -94,6 +97,7 @@ internal fun SteamModuleSettingNavigation(
         entry<Settings> {
             SteamModuleSettingScreen(
                 state = pageState,
+                onLanguageChange = onLanguageChange,
                 steamDbEnabled = steamDbEnabled,
                 onSteamDbEnabledChange = onSteamDbEnabledChange,
                 liquidGlassEnabled = liquidGlassEnabled,

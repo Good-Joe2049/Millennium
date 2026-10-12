@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamdb
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization as L
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
@@ -56,7 +59,7 @@ internal class OnlineStatsSection(context: Context) : SteamDbSectionView {
     private val values = ArrayList<TextView>(4)
 
     init {
-        val labels = listOf("实时在线", "24 小时峰值", "历史峰值", "关注人数")
+        val labels = listOf(L.text(context, R.string.db_players), L.text(context, R.string.db_peak_today), L.text(context, R.string.db_peak_all), L.text(context, R.string.db_followers))
         repeat(2) { rowIndex ->
             if (rowIndex == 1) root.addView(Ui.divider(context), LinearLayout.LayoutParams(-1, 1))
             val row = Ui.row(context)

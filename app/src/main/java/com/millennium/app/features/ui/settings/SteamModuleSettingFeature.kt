@@ -1,5 +1,8 @@
 package com.millennium.app.features.ui.settings
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization
+
 import android.app.Activity
 import android.content.Context
 import android.content.res.AssetManager
@@ -32,6 +35,7 @@ import java.util.IdentityHashMap
 /** Owns a full-screen window in Steam; ComponentDialog supplies module-side Compose owners. */
 internal class SteamModuleSettingFeature(
     private val emit: (priority: Int, message: String) -> Unit,
+    private val onLanguageChanged: (Activity) -> Unit,
     private val onSteamDbChanged: (Activity, Boolean) -> Unit,
 ) {
     private val sessions = IdentityHashMap<Activity, SettingSession>()
@@ -76,32 +80,39 @@ internal class SteamModuleSettingFeature(
                     }
                     val dark = isSystemInDarkTheme()
                     SideEffect { styleSystemBars(window, dark) }
-                    SteamModuleSettingNavigation(
-                        menuSnapshot = session.menuSnapshot,
-                        pageState = session.pageState,
-                        animateEntrance = restoredState == null,
-                        closing = session.closing,
-                        steamDbEnabled = enabled,
-                        liquidGlassEnabled = liquidGlassEnabled,
-                        onLiquidGlassEnabledChange = { value ->
-                            SteamModuleSettings.setLiquidGlassEnabled(activity, value)
-                            liquidGlassEnabled = value
-                            emit(Log.INFO, "module setting changed liquidGlassEnabled=$value")
-                        },
-                        onSteamDbEnabledChange = { value ->
-                            SteamModuleSettings.setSteamDbEnabled(activity, value)
-                            enabled = value
-                            onSteamDbChanged(activity, value)
-                            emit(Log.INFO, "module setting changed steamDbEnabled=$value")
-                        },
-                        onRequestClose = {
-                            if (!session.closing) {
-                                session.menuSnapshot = captureMenu(activity) ?: session.menuSnapshot
-                                session.closing = true
-                            }
-                        },
-                        onClosed = { dialog.dismiss() },
-                    )
+                    ModuleLocalization.Provide {
+                        SteamModuleSettingNavigation(
+                            menuSnapshot = session.menuSnapshot,
+                            pageState = session.pageState,
+                            animateEntrance = restoredState == null,
+                            closing = session.closing,
+                            steamDbEnabled = enabled,
+                            liquidGlassEnabled = liquidGlassEnabled,
+                            onLiquidGlassEnabledChange = { value ->
+                                SteamModuleSettings.setLiquidGlassEnabled(activity, value)
+                                liquidGlassEnabled = value
+                                emit(Log.INFO, "module setting changed liquidGlassEnabled=$value")
+                            },
+                            onSteamDbEnabledChange = { value ->
+                                SteamModuleSettings.setSteamDbEnabled(activity, value)
+                                enabled = value
+                                onSteamDbChanged(activity, value)
+                                emit(Log.INFO, "module setting changed steamDbEnabled=$value")
+                            },
+                            onLanguageChange = { language ->
+                                SteamModuleSettings.setLanguage(activity, language)
+                                ModuleLocalization.language = language
+                                onLanguageChanged(activity)
+                            },
+                            onRequestClose = {
+                                if (!session.closing) {
+                                    session.menuSnapshot = captureMenu(activity) ?: session.menuSnapshot
+                                    session.closing = true
+                                }
+                            },
+                            onClosed = { dialog.dismiss() },
+                        )
+                    }
                 }
             }
             dialog.setContentView(content)
@@ -119,7 +130,12 @@ internal class SteamModuleSettingFeature(
             openingDialog?.dismiss()
             sessions.remove(activity)
             emit(Log.ERROR, "module setting open failed: " + Log.getStackTraceString(error))
-            Toast.makeText(activity, "模块设置打开失败，请查看 module setting 日志", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                activity,
+                runCatching { ModuleLocalization.text(activity, R.string.module_open_failed) }
+                    .getOrDefault("Could not open module settings. Check the module setting logs."),
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 

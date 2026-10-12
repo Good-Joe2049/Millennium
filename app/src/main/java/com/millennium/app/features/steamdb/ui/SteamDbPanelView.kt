@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamdb.ui
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization as L
+
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -22,20 +25,20 @@ import com.millennium.app.features.steamdb.ui.SteamDbUi as Ui
 
 /** Panel chrome only; individual features own their data and display state. */
 @SuppressLint("SetTextI18n")
-internal class SteamDbPanelView(context: Context, sections: List<SteamDbSectionView>) {
+internal class SteamDbPanelView(private val context: Context, sections: List<SteamDbSectionView>) {
     val root = Ui.column(context).apply { layoutDirection = View.LAYOUT_DIRECTION_LTR }
-    private val refreshButton = SteamDbPanelIcon.button(context, SteamDbPanelIcon.Kind.REFRESH, "刷新当前游戏数据")
-    private val gameName = Ui.text(context, "Steam 游戏", 13f, Ui.TEXT, medium = true).apply {
+    private val refreshButton = SteamDbPanelIcon.button(context, SteamDbPanelIcon.Kind.REFRESH, L.text(context, R.string.db_refresh))
+    private val gameName = Ui.text(context, L.text(context, R.string.db_game), 13f, Ui.TEXT, medium = true).apply {
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
     private val appLabel = Ui.text(context, "APP —", 9f).apply { typeface = Typeface.MONOSPACE }
-    private val stateLabel = Ui.text(context, "在线数据", 10f, Ui.LABEL)
+    private val stateLabel = Ui.text(context, L.text(context, R.string.db_live), 10f, Ui.LABEL)
     private val dot = View(context).apply { background = Ui.background(context, 3, Ui.MUTED) }
     private val collected = Ui.text(context, "—", 9f)
     private val link = Button(context).apply {
         text = "SteamDB"
-        contentDescription = "在浏览器打开当前游戏的 SteamDB 页面"
+        contentDescription = L.text(context, R.string.db_open_browser)
         textSize = 9f
         isAllCaps = false
         setTextColor(Ui.MUTED)
@@ -88,7 +91,7 @@ internal class SteamDbPanelView(context: Context, sections: List<SteamDbSectionV
                 try {
                     context.startActivity(Intent(Intent.ACTION_VIEW, "https://steamdb.info/app/$id/".toUri()))
                 } catch (_: ActivityNotFoundException) {
-                    Toast.makeText(context, "未找到可以打开链接的浏览器", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, L.text(context, R.string.db_no_browser), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -97,7 +100,7 @@ internal class SteamDbPanelView(context: Context, sections: List<SteamDbSectionV
 
     fun setPage(name: String?, id: Int?) {
         appId = id
-        gameName.text = name?.takeIf { it.isNotBlank() } ?: id?.let { "App $it" } ?: "Steam 游戏"
+        gameName.text = name?.takeIf { it.isNotBlank() } ?: id?.let { "App $it" } ?: L.text(context, R.string.db_game)
         appLabel.text = id?.let { "APP $it" } ?: "APP —"
         link.isEnabled = id != null
         link.alpha = if (id != null) 1f else 0.4f
@@ -105,33 +108,34 @@ internal class SteamDbPanelView(context: Context, sections: List<SteamDbSectionV
 
     fun loading() {
         dot.background = Ui.background(root.context, 3, Ui.MUTED)
-        collected.text = "正在读取…"
+        collected.text = L.text(context, R.string.db_loading)
         refreshButton.isEnabled = false
         refreshButton.alpha = 0.4f
-        stateLabel.text = "在线数据 · 正在读取"
+        stateLabel.text = L.text(context, R.string.db_live_loading)
     }
 
     fun fetchedAt(timeMillis: Long) {
-        collected.text = "采集于 " + DateTimeFormatter.ofPattern("MM/dd HH:mm")
-            .withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(timeMillis))
+        collected.text = L.text(context, R.string.db_fetched,
+            DateTimeFormatter.ofPattern("MM/dd HH:mm")
+                .withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(timeMillis)))
     }
 
     fun finished(partial: Boolean, available: Boolean) {
         refreshButton.isEnabled = true
         refreshButton.alpha = 1f
         stateLabel.text = when {
-            !available -> "在线数据 · 暂时不可用"
-            partial -> "在线数据 · 部分不可用"
-            else -> "在线数据"
+            !available -> L.text(context, R.string.db_live_unavailable)
+            partial -> L.text(context, R.string.db_live_partial)
+            else -> L.text(context, R.string.db_live)
         }
         dot.background = Ui.background(root.context, 3, if (available) Ui.ACCENT else Ui.MUTED)
-        if (collected.text == "正在读取…") collected.text = if (available) "部分数据可用" else "暂未取得数据"
+        if (collected.text == L.text(context, R.string.db_loading)) collected.text = if (available) L.text(context, R.string.db_partial) else L.text(context, R.string.db_no_data)
     }
 
     fun unavailable(message: String) {
         setPage(null, null)
         finished(partial = false, available = false)
-        stateLabel.text = "在线数据"
+        stateLabel.text = L.text(context, R.string.db_live)
         collected.text = message
     }
 
@@ -155,7 +159,7 @@ internal class SteamDbPanelView(context: Context, sections: List<SteamDbSectionV
                 setPadding(0, Ui.dp(context, 4), 0, 0)
             })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(SteamDbPanelIcon.button(context, SteamDbPanelIcon.Kind.CLOSE, "收起面板").apply {
+        header.addView(SteamDbPanelIcon.button(context, SteamDbPanelIcon.Kind.CLOSE, L.text(context, R.string.db_collapse)).apply {
             setOnClickListener { onClose() }
         }, LinearLayout.LayoutParams(Ui.dp(context, 48), Ui.dp(context, 48)))
         panel.addView(header, LinearLayout.LayoutParams(-1, Ui.dp(context, Ui.HEADER_HEIGHT)).apply {

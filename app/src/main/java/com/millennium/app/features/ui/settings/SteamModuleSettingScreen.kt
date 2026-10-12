@@ -1,5 +1,10 @@
 package com.millennium.app.features.ui.settings
 
+import androidx.compose.ui.res.stringResource
+import com.millennium.app.core.ModuleLanguage
+import com.millennium.app.core.ModuleLocalization
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -58,19 +63,18 @@ internal class SteamModuleSettingState(selectedTab: Int = 0, scrollPosition: Int
 @Composable
 internal fun SteamModuleSettingScreen(
     state: SteamModuleSettingState,
+    onLanguageChange: (ModuleLanguage) -> Unit,
     steamDbEnabled: Boolean,
     onSteamDbEnabledChange: (Boolean) -> Unit,
     liquidGlassEnabled: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
 ) {
-    val tabs = remember {
-        listOf(
-            "常规" to R.drawable.ic_module_nav_general,
-            "主题" to R.drawable.ic_module_nav_themes,
-            "日志" to R.drawable.ic_module_nav_logs,
-            "设置" to R.drawable.ic_module_nav_settings,
-        )
-    }
+    val tabs = listOf(
+        stringResource(R.string.module_general) to R.drawable.ic_module_nav_general,
+        stringResource(R.string.module_themes) to R.drawable.ic_module_nav_themes,
+        stringResource(R.string.module_logs) to R.drawable.ic_module_nav_logs,
+        stringResource(R.string.module_settings) to R.drawable.ic_module_nav_settings,
+    )
 
     val scope = rememberCoroutineScope()
     val selectTab: (Int) -> Unit = { index ->
@@ -155,14 +159,14 @@ internal fun SteamModuleSettingScreen(
                             onLiquidGlassEnabledChange = onLiquidGlassEnabledChange,
                         )
                         1 -> PlaceholderPage(
-                            title = "主题",
-                            summary = "Steam 主题功能将在这里提供。",
+                            title = stringResource(R.string.module_themes),
+                            summary = stringResource(R.string.module_themes_summary),
                         )
                         2 -> PlaceholderPage(
-                            title = "日志",
-                            summary = "日志查看功能将在这里提供。",
+                            title = stringResource(R.string.module_logs),
+                            summary = stringResource(R.string.module_logs_summary),
                         )
-                        else -> SettingsPage()
+                        else -> SettingsPage(onLanguageChange)
                     }
                 }
             }
@@ -178,30 +182,30 @@ private fun GeneralPage(
     glassSupported: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
 ) {
-    SmallTitle(text = "常规")
+    SmallTitle(text = stringResource(R.string.module_general))
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
         SwitchPreference(
-            title = "SteamDB 悬浮面板",
-            summary = "在游戏商店页面显示 Millennium 悬浮球和数据面板",
+            title = stringResource(R.string.module_steamdb),
+            summary = stringResource(R.string.module_steamdb_summary),
             checked = steamDbEnabled,
             onCheckedChange = onSteamDbEnabledChange,
         )
         SteamGuardExportEntry()
     }
-    SmallTitle(text = "界面美化")
+    SmallTitle(text = stringResource(R.string.module_appearance))
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
         SwitchPreference(
-            title = "液态玻璃底栏",
-            summary = if (glassSupported) "仅应用于模块设置页面的底栏"
-            else "需要 Android 13 或更高版本",
+            title = stringResource(R.string.module_glass),
+            summary = if (glassSupported) stringResource(R.string.module_glass_summary)
+            else stringResource(R.string.module_glass_unsupported),
             checked = liquidGlassEnabled,
             enabled = glassSupported,
             onCheckedChange = onLiquidGlassEnabledChange,
@@ -217,21 +221,31 @@ private fun PlaceholderPage(title: String, summary: String) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
-        BasicComponent(title = "敬请期待", summary = summary)
+        BasicComponent(title = stringResource(R.string.module_coming_soon), summary = summary)
     }
 }
 
 @Composable
-private fun SettingsPage() {
-    SmallTitle(text = "设置")
+private fun SettingsPage(onLanguageChange: (ModuleLanguage) -> Unit) {
+    SmallTitle(text = stringResource(R.string.module_settings))
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
+        OverlayDropdownPreference(
+            title = stringResource(R.string.module_language),
+            items = listOf(
+                stringResource(R.string.module_language_system),
+                stringResource(R.string.module_language_english),
+                stringResource(R.string.module_language_chinese),
+            ),
+            selectedIndex = ModuleLocalization.language.ordinal,
+            onSelectedIndexChange = { onLanguageChange(ModuleLanguage.entries[it]) },
+        )
         BasicComponent(
-            title = "敬请期待",
-            summary = "模块设置页面语言、配置备份与恢复，以及深色、浅色、莫奈主题将在这里提供。",
+            title = stringResource(R.string.module_coming_soon),
+            summary = stringResource(R.string.module_settings_summary),
         )
     }
 }

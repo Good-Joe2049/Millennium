@@ -1,6 +1,7 @@
 package com.millennium.app.features.steamguard.export
 
 import android.net.Uri
+import androidx.core.net.toUri
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.common.BitMatrix
@@ -8,20 +9,28 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.millennium.app.features.steamguard.data.SteamGuardAccount
 
-internal enum class SteamGuardQrFormat(val label: String, val prefix: String) {
-    Stratum("Stratum", "otpauth://totp/Steam:"),
-    Aegis("Aegis", "otpauth://steam/"),
+internal enum class SteamGuardQrFormat(
+    val label: String,
+    private val prefix: String,
+    val packageName: String,
+) {
+    Stratum("Stratum", "otpauth://totp/Steam:", "com.stratumauth.app"),
+    Aegis("Aegis", "otpauth://steam/", "com.beemdevelopment.aegis");
+
+    fun createUri(account: SteamGuardAccount): Uri {
+        require(account.username.isNotBlank() && account.secret.isNotBlank())
+        return (
+                "$prefix${Uri.encode(account.username)}" +
+                        "?secret=${Uri.encode(account.secret)}&issuer=Steam"
+                ).toUri()
+    }
 }
 
 internal data class SteamGuardQrPair(val stratum: BitMatrix, val aegis: BitMatrix)
 
 internal object SteamGuardQrCode {
     fun createPair(account: SteamGuardAccount): SteamGuardQrPair {
-        require(account.username.isNotBlank() && account.secret.isNotBlank())
-        val uris = SteamGuardQrFormat.entries.map { format ->
-            "${format.prefix}${Uri.encode(account.username)}" +
-                    "?secret=${Uri.encode(account.secret)}&issuer=Steam"
-        }
+        val uris = SteamGuardQrFormat.entries.map { it.createUri(account).toString() }
         val writer = QRCodeWriter()
         val hints = mapOf(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,

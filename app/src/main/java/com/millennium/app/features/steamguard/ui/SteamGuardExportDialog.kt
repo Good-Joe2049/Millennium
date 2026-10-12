@@ -1,5 +1,11 @@
 package com.millennium.app.features.steamguard.ui
 
+import com.millennium.app.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +47,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.millennium.app.features.steamguard.data.SteamGuardAccount
 import com.millennium.app.features.steamguard.data.SteamGuardData
+import com.millennium.app.features.steamguard.export.SteamGuardAuthenticatorExport
 import com.millennium.app.features.steamguard.export.SteamGuardClipboard
 import com.millennium.app.features.steamguard.export.SteamGuardQrCode
 import com.millennium.app.features.steamguard.export.SteamGuardQrFormat
@@ -63,8 +70,8 @@ internal fun SteamGuardExportEntry() {
     var holdDown by rememberSaveable { mutableStateOf(false) }
 
     ArrowPreference(
-        title = "Steam 令牌导出",
-        summary = "查看令牌信息",
+        title = stringResource(R.string.guard_export),
+        summary = stringResource(R.string.guard_summary),
         onClick = {
             showDialog = true
             holdDown = true
@@ -74,7 +81,7 @@ internal fun SteamGuardExportEntry() {
 
     OverlayDialog(
         show = showDialog,
-        title = "Steam 令牌导出",
+        title = stringResource(R.string.guard_export),
         largeScreen = true,
         onDismissRequest = { showDialog = false },
         onDismissFinished = { holdDown = false },
@@ -84,6 +91,12 @@ internal fun SteamGuardExportEntry() {
             initial = remember { SteamGuardData.currentAccounts() },
         )
         var selectedUsername by rememberSaveable { mutableStateOf<String?>(null) }
+        var format by rememberSaveable { mutableStateOf(SteamGuardQrFormat.Stratum) }
+        val context = LocalContext.current
+        val entries = accounts.orEmpty()
+        val selectedIndex = entries.indexOfFirst { it.username == selectedUsername }
+            .coerceAtLeast(0)
+        val account = entries.getOrNull(selectedIndex)
         Column(Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
@@ -92,46 +105,59 @@ internal fun SteamGuardExportEntry() {
                     .padding(bottom = 16.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                val entries = accounts.orEmpty()
-                if (entries.isEmpty()) {
+                if (account == null) {
                     ExportAccount(null)
                     Text(
-                        text = if (accounts == null) "尚未获取令牌数据，可先打开 Steam 令牌页面。"
-                        else "未找到可导出的 Steam 令牌。",
+                        text = if (accounts == null) stringResource(R.string.guard_not_loaded)
+                        else stringResource(R.string.guard_not_found),
                         style = MiuixTheme.textStyles.body2,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
                     )
                 } else {
-                    val selectedIndex = entries.indexOfFirst { it.username == selectedUsername }
-                        .coerceAtLeast(0)
                     if (entries.size > 1) {
                         OverlayDropdownPreference(
-                            title = "账号",
+                            title = stringResource(R.string.guard_account),
                             items = entries.map { it.username },
                             selectedIndex = selectedIndex,
                             insideMargin = PaddingValues(vertical = 8.dp),
                             onSelectedIndexChange = { selectedUsername = entries[it].username },
                         )
                     }
-                    val account = entries[selectedIndex]
                     ExportAccount(account)
                     HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                    ExportQrCode(account)
+                    ExportQrCode(account, format, onFormatChange = { format = it })
                 }
             }
-            TextButton(
-                text = "关闭",
-                onClick = { showDialog = false },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-            )
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    text = stringResource(R.string.module_close),
+                    onClick = { showDialog = false },
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    text = stringResource(R.string.guard_add_to_app, format.label),
+                    onClick = {
+                        account?.let { SteamGuardAuthenticatorExport.open(context, it, format) }
+                    },
+                    modifier = Modifier.weight(2f),
+                    enabled = account != null && account.username.isNotBlank() && account.secret.isNotBlank(),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ExportQrCode(account: SteamGuardAccount) {
-    var format by rememberSaveable { mutableStateOf(SteamGuardQrFormat.Stratum) }
+private fun ExportQrCode(
+    account: SteamGuardAccount,
+    format: SteamGuardQrFormat,
+    onFormatChange: (SteamGuardQrFormat) -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -140,11 +166,11 @@ private fun ExportQrCode(account: SteamGuardAccount) {
         TabRowWithContour(
             tabs = remember { SteamGuardQrFormat.entries.map { it.label } },
             selectedTabIndex = format.ordinal,
-            onTabSelected = { format = SteamGuardQrFormat.entries[it] },
+            onTabSelected = { onFormatChange(SteamGuardQrFormat.entries[it]) },
         )
         if (account.username.isBlank() || account.secret.isBlank()) {
             Text(
-                text = "令牌数据不完整，暂无法生成二维码。",
+                text = stringResource(R.string.guard_incomplete),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceSecondary,
             )
@@ -169,7 +195,7 @@ private fun ExportQrCode(account: SteamGuardAccount) {
                         )
                     } else if (qrCodes?.isFailure == true) {
                         Text(
-                            text = "二维码生成失败",
+                            text = stringResource(R.string.guard_qr_failed),
                             style = MiuixTheme.textStyles.body2,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary,
                         )
@@ -177,7 +203,7 @@ private fun ExportQrCode(account: SteamGuardAccount) {
                 }
             }
             Text(
-                text = "使用 ${format.label} 扫描二维码导入",
+                text = stringResource(R.string.guard_qr_scan, format.label),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceSecondary,
                 textAlign = TextAlign.Center,
@@ -188,14 +214,25 @@ private fun ExportQrCode(account: SteamGuardAccount) {
 
 @Composable
 private fun ExportAccount(account: SteamGuardAccount?) {
-    ExportField(label = "类型", value = "Steam")
-    ExportField(label = "用户名", value = account?.username)
-    ExportField(label = "服务商", value = "Steam")
-    ExportField(label = "密钥", value = account?.secret)
+    val labels = listOf(
+        stringResource(R.string.guard_type), stringResource(R.string.guard_username),
+        stringResource(R.string.guard_issuer), stringResource(R.string.guard_secret),
+    ).map { stringResource(R.string.guard_field_label, it) }
+    val measurer = rememberTextMeasurer()
+    val style = MiuixTheme.textStyles.body1
+    val width = with(LocalDensity.current) {
+        labels.maxOf { measurer.measure(AnnotatedString(it), style).size.width }.toDp()
+    }
+    ExportField(labels[0], "Steam", stringResource(R.string.guard_copy_type), null, width)
+    ExportField(labels[1], account?.username, stringResource(R.string.guard_copy_username),
+        stringResource(R.string.guard_missing_value, stringResource(R.string.guard_username)), width)
+    ExportField(labels[2], "Steam", stringResource(R.string.guard_copy_issuer), null, width)
+    ExportField(labels[3], account?.secret, stringResource(R.string.guard_copy_secret),
+        stringResource(R.string.guard_missing_value, stringResource(R.string.guard_secret)), width)
 }
 
 @Composable
-private fun ExportField(label: String, value: String?) {
+private fun ExportField(label: String, value: String?, copyLabel: String, missing: String?, labelWidth: Dp) {
     val context = LocalContext.current
     val viewConfiguration = LocalViewConfiguration.current
     val textTouchConfiguration = remember(viewConfiguration) {
@@ -210,13 +247,12 @@ private fun ExportField(label: String, value: String?) {
         } ?: RectangleShape
     }
     val textStyle = MiuixTheme.textStyles.body1
-    val labelWidth = with(LocalDensity.current) { (textStyle.fontSize * 4).toDp() }
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "$label：",
+            text = label,
             modifier = Modifier.width(labelWidth).alignByBaseline(),
             style = textStyle,
             color = MiuixTheme.colorScheme.onSurfaceSecondary,
@@ -224,14 +260,14 @@ private fun ExportField(label: String, value: String?) {
         // Keep Compose's automatic touch-target expansion out of the surrounding blank space.
         CompositionLocalProvider(LocalViewConfiguration provides textTouchConfiguration) {
             Text(
-                text = value?.ifEmpty { null } ?: "暂无$label",
+                text = value?.ifEmpty { null } ?: missing.orEmpty(),
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .alignByBaseline()
                     .clip(valueShape)
                     .clickable(
                         enabled = !value.isNullOrEmpty(),
-                        onClickLabel = "复制$label",
+                        onClickLabel = copyLabel,
                         role = Role.Button,
                     ) {
                         value?.let { SteamGuardClipboard.copy(context, label, it) }

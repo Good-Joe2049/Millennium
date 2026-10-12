@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamguard.ui
 
+import com.millennium.app.R
+import androidx.compose.ui.res.stringResource
+
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -46,10 +49,13 @@ internal fun SteamGuardQrMorph(
             )
         }
     }
+    val qrDescription = stringResource(R.string.guard_qr_description, format.label)
+    val morphing = stringResource(R.string.guard_qr_morphing)
+    val ready = stringResource(R.string.guard_qr_ready)
     Canvas(
         modifier = modifier.semantics {
-            contentDescription = "${format.label} 导入二维码"
-            stateDescription = if (progress.isRunning) "变形中" else "可扫描"
+            contentDescription = qrDescription
+            stateDescription = if (progress.isRunning) morphing else ready
         },
     ) {
         drawIntoCanvas {

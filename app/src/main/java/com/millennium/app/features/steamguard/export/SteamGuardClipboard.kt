@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamguard.export
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -21,7 +24,7 @@ internal object SteamGuardClipboard {
         }.isSuccess
         Toast.makeText(
             context,
-            if (copied) "已复制到剪贴板" else "复制失败，请重试",
+            ModuleLocalization.text(context, if (copied) R.string.guard_copied else R.string.guard_copy_failed),
             Toast.LENGTH_SHORT,
         ).show()
     }

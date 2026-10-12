@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamdb
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization as L
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -48,7 +51,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
             if (it.active) refresh(activity, it)
             else {
                 it.generation++
-                it.unavailable("打开面板后读取当前游戏数据")
+                it.unavailable(L.text(activity, R.string.db_open_panel))
             }
         }
     }
@@ -59,7 +62,7 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
         val webView = views[activity]?.get()
         val appId = SteamStorePageReader.appId(webView?.url)
         if (webView == null || !webView.isShown || appId == null) {
-            panel.unavailable("当前不是 Steam 游戏商店页面")
+            panel.unavailable(L.text(activity, R.string.db_not_store))
             return
         }
         if (force) repository.invalidate(appId)
@@ -119,8 +122,8 @@ internal class SteamDbPanelController(private val emit: (Int, String) -> Unit) {
             if ((!reviewsReady || !panel.priceRequested || page.name == null) && attempt < 3) {
                 main.postDelayed({ readMetadata(activity, panel, webView, appId, generation, attempt + 1) }, 750L)
             } else {
-                if (!reviewsReady) panel.rating.section.unavailable("未读取到商店评价数据")
-                if (!panel.priceRequested) panel.price.section.unavailable("未识别到商店币种或定价地区")
+                if (!reviewsReady) panel.rating.section.unavailable(L.text(activity, R.string.db_reviews_unavailable))
+                if (!panel.priceRequested) panel.price.section.unavailable(L.text(activity, R.string.db_region_unavailable))
                 panel.finish("metadata", reviewsReady && panel.priceRequested)
                 if (!reviewsReady || !panel.priceRequested) {
                     emit(Log.WARN, "steamdb page metadata incomplete appId=$appId reviewsReady=$reviewsReady " +

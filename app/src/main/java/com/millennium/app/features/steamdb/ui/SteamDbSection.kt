@@ -1,5 +1,8 @@
 package com.millennium.app.features.steamdb.ui
 
+import com.millennium.app.R
+import com.millennium.app.core.ModuleLocalization as L
+
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -88,22 +91,23 @@ internal object SteamDbUi {
     } ?: "—"
 
     // BrowserExtension FormatRelativeDate: floor days, >30 days => round(days / 30).
-    // Chinese Intl.RelativeTimeFormat(numeric: "auto") uses these special day/month names.
-    fun relativeDate(seconds: Long, nowMillis: Long = System.currentTimeMillis()): String {
+    // Preserve the existing relative-date calculation; localize its day/month labels.
+    fun relativeDate(context: Context, seconds: Long, nowMillis: Long = System.currentTimeMillis()): String {
         val days = Math.floorDiv(nowMillis - seconds * 1000L, 86_400_000L)
         if (days > 30) {
             val months = (days / 30.0).roundToLong()
-            return if (months == 1L) "上个月" else "${months}个月前"
+            return if (months == 1L) L.text(context, R.string.date_last_month) else L.quantity(context, R.plurals.date_months_ago, months.toInt(), months)
         }
         return when (days) {
-            0L -> "今天"
-            1L -> "昨天"
-            2L -> "前天"
-            -1L -> "明天"
-            -2L -> "后天"
-            else -> if (days > 0) "${days}天前" else "${-days}天后"
+            0L -> L.text(context, R.string.date_today)
+            1L -> L.text(context, R.string.date_yesterday)
+            2L -> L.text(context, R.string.date_before_yesterday)
+            -1L -> L.text(context, R.string.date_tomorrow)
+            -2L -> L.text(context, R.string.date_after_tomorrow)
+            else -> if (days > 0) L.quantity(context, R.plurals.date_days_ago, days.toInt(), days) else L.quantity(context, R.plurals.date_days_later, (-days).toInt(), -days)
         }
     }
 
-    fun dateWithRelative(seconds: Long): String = "${date(seconds)}（${relativeDate(seconds)}）"
+    fun dateWithRelative(context: Context, seconds: Long): String =
+        L.text(context, R.string.date_with_relative, date(seconds), relativeDate(context, seconds))
 }

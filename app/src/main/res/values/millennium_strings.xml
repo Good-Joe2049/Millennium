@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="module_general">"General"</string>
+    <string name="module_themes">"Themes"</string>
+    <string name="module_logs">"Logs"</string>
+    <string name="module_settings">"Settings"</string>
+    <string name="module_steamdb">"SteamDB floating panel"</string>
+    <string name="module_steamdb_summary">"Show the Millennium floating button and data panel on game store pages"</string>
+    <string name="module_appearance">"Appearance"</string>
+    <string name="module_glass">"Liquid Glass navigation bar"</string>
+    <string name="module_glass_summary">"Applies only to the navigation bar in module settings"</string>
+    <string name="module_glass_unsupported">"Requires Android 13 or later"</string>
+    <string name="module_coming_soon">"Coming soon"</string>
+    <string name="module_themes_summary">"Steam themes will be available here."</string>
+    <string name="module_logs_summary">"Log viewing will be available here."</string>
+    <string name="module_settings_summary">"Configuration backup and restore, and dark, light, and Monet themes will be available here."</string>
+    <string name="module_open_failed">"Could not open module settings. Check the “module setting” logs."</string>
+    <string name="module_language">"Language"</string>
+    <string name="module_language_system">"Follow System"</string>
+    <string name="guard_export">"Export Steam Guard"</string>
+    <string name="guard_summary">"View authenticator details"</string>
+    <string name="guard_account">"Account"</string>
+    <string name="guard_type">"Type"</string>
+    <string name="guard_username">"Username"</string>
+    <string name="guard_issuer">"Issuer"</string>
+    <string name="guard_secret">"Secret"</string>
+    <string name="module_close">"Close"</string>
+    <string name="guard_not_loaded">"Authenticator data is not available yet. Try opening the Steam Guard page first."</string>
+    <string name="guard_not_found">"No Steam Guard authenticators found to export."</string>
+    <string name="guard_missing_value">"%1$s unavailable"</string>
+    <string name="guard_copy_type">"Copy type"</string>
+    <string name="guard_copy_username">"Copy username"</string>
+    <string name="guard_copy_issuer">"Copy issuer"</string>
+    <string name="guard_copy_secret">"Copy secret"</string>
+    <string name="guard_copied">"Copied to clipboard"</string>
+    <string name="guard_copy_failed">"Could not copy. Please try again."</string>
+    <string name="guard_incomplete">"Authenticator data is incomplete. Unable to generate a QR code."</string>
+    <string name="guard_qr_failed">"Could not generate QR code"</string>
+    <string name="guard_qr_scan">"Scan with %1$s to import"</string>
+    <string name="guard_qr_description">"QR code for importing into %1$s"</string>
+    <string name="guard_qr_morphing">"Morphing"</string>
+    <string name="guard_qr_ready">"Ready to scan"</string>
+    <string name="guard_add_to_app">"Add to %1$s"</string>
+    <string name="guard_app_unavailable">"Could not open %1$s. Check that it is installed and enabled."</string>
+    <string name="guard_app_open_failed">"The system blocked opening %1$s. Check app launch permissions."</string>
+    <string name="guard_field_label">"%1$s:"</string>
+    <string name="db_game">"Steam game"</string>
+    <string name="db_live">"Live data"</string>
+    <string name="db_players">"Current players"</string>
+    <string name="db_peak_today">"24-hour peak"</string>
+    <string name="db_peak_all">"All-time peak"</string>
+    <string name="db_followers">"Followers"</string>
+    <string name="db_rating">"SteamDB rating"</string>
+    <string name="db_reviews_unknown">"— reviews"</string>
+    <string name="db_reviews_empty">"No reviews yet"</string>
+    <string name="db_rating_adjusted">"Adjusted for review count"</string>
+    <string name="db_lowest">"Historical low"</string>
+    <string name="db_lowest_limited">"2-year low"</string>
+    <string name="db_lowest_last">"Last seen %1$s"</string>
+    <string name="db_lowest_date_missing">"Last seen date unavailable"</string>
+    <string name="db_free">"Free to play"</string>
+    <string name="db_no_purchase">"No purchase required"</string>
+    <string name="db_lowest_unavailable">"Historical low temporarily unavailable"</string>
+    <string name="db_open_store">"Open a game's store page to view"</string>
+    <string name="db_loading_live">"Loading live data"</string>
+    <string name="db_updated">"Last updated"</string>
+    <string name="db_updated_description">"Last updated %1$s"</string>
+    <string name="db_loading_date">"Loading update date"</string>
+    <string name="db_date_missing">"No update date available on SteamDB"</string>
+    <string name="db_date_unavailable">"Update date temporarily unavailable"</string>
+    <string name="db_loading">"Loading…"</string>
+    <string name="db_live_loading">"Live data · Loading"</string>
+    <string name="db_live_unavailable">"Live data · Temporarily unavailable"</string>
+    <string name="db_live_partial">"Live data · Partially unavailable"</string>
+    <string name="db_partial">"Some data is available"</string>
+    <string name="db_no_data">"No data retrieved yet"</string>
+    <string name="db_fetched">"Retrieved at %1$s"</string>
+    <string name="db_open_panel">"Open the panel to load data for this game"</string>
+    <string name="db_not_store">"You are not on a Steam game store page"</string>
+    <string name="db_reviews_unavailable">"Could not load store reviews"</string>
+    <string name="db_region_unavailable">"Could not determine the store currency or pricing region"</string>
+    <string name="db_no_browser">"No browser available to open this link"</string>
+    <string name="db_refresh">"Refresh data for this game"</string>
+    <string name="db_open_browser">"Open this game's SteamDB page in a browser"</string>
+    <string name="db_collapse">"Collapse panel"</string>
+    <string name="date_today">"Today"</string>
+    <string name="date_yesterday">"Yesterday"</string>
+    <string name="date_before_yesterday">"2 days ago"</string>
+    <string name="date_tomorrow">"Tomorrow"</string>
+    <string name="date_after_tomorrow">"In 2 days"</string>
+    <string name="date_last_month">"Last month"</string>
+    <string name="date_with_relative">"%1$s (%2$s)"</string>
+    <string name="module_language_english" translatable="false">"English"</string>
+    <string name="module_language_chinese" translatable="false">"中文（简体）"</string>
+    <plurals name="db_reviews">
+        <item quantity="one">"%1$s review"</item>
+        <item quantity="other">"%1$s reviews"</item>
+    </plurals>
+    <plurals name="db_price_occurrences">
+        <item quantity="one">" · Recorded %1$d time"</item>
+        <item quantity="other">" · Recorded %1$d times"</item>
+    </plurals>
+    <plurals name="date_days_ago">
+        <item quantity="one">"%1$d day ago"</item>
+        <item quantity="other">"%1$d days ago"</item>
+    </plurals>
+    <plurals name="date_days_later">
+        <item quantity="one">"In %1$d day"</item>
+        <item quantity="other">"In %1$d days"</item>
+    </plurals>
+    <plurals name="date_months_ago">
+        <item quantity="one">"%1$d month ago"</item>
+        <item quantity="other">"%1$d months ago"</item>
+    </plurals>
+</resources>

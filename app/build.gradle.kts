@@ -11,8 +11,8 @@ android {
         applicationId = "com.millennium.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.0.8"
+        versionCode = 12
+        versionName = "1.1.0"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -46,6 +46,18 @@ android {
         resources {
             merges += "META-INF/xposed/*"
             excludes += "**"
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        val abis = android.defaultConfig.ndk.abiFilters.sorted().joinToString("+")
+        variant.outputs.forEach { output ->
+            @Suppress("UnstableApiUsage")
+            output.outputFileName.set(
+                output.versionName.map { version -> "Millennium-v$version-$abis.apk" },
+            )
         }
     }
 }
