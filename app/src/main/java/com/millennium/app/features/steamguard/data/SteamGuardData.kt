@@ -3,6 +3,7 @@ package com.millennium.app.features.steamguard.data
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -14,6 +15,8 @@ internal data class SteamGuardAccount(val username: String, val secret: String)
 /** Process-only cache. Dialog fields are parsed when the export UI requests them. */
 internal object SteamGuardData {
     private val cachedJson = MutableStateFlow<String?>(null)
+
+    val snapshot = cachedJson.asStateFlow()
 
     val accounts: Flow<List<SteamGuardAccount>?> = cachedJson.map(::parseAccounts).distinctUntilChanged()
 

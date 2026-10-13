@@ -2,6 +2,7 @@ package com.millennium.app.features.ui.settings
 
 import com.millennium.app.R
 import com.millennium.app.core.ModuleLocalization
+import com.millennium.app.features.steammanagement.SteamPrivilegeAccess
 
 import android.app.Activity
 import android.content.Context
@@ -57,6 +58,7 @@ internal class SteamModuleSettingFeature(
 
         var openingDialog: ComponentDialog? = null
         try {
+            SteamPrivilegeAccess.initialize(activity.applicationContext)
             val context = settingContext(activity)
             val dialog = ComponentDialog(context, android.R.style.Theme_Material_NoActionBar)
             openingDialog = dialog
@@ -158,6 +160,7 @@ internal class SteamModuleSettingFeature(
     }
 
     fun resume(activity: Activity) {
+        SteamPrivilegeAccess.refresh()
         pendingRestore.remove(activity)?.let { show(activity, restoredState = it) }
     }
 

@@ -112,4 +112,67 @@
         <item quantity="one">"%1$d month ago"</item>
         <item quantity="other">"%1$d months ago"</item>
     </plurals>
+    <string name="module_working_mode">"Working mode"</string>
+    <string name="module_working_mode_disabled">"Disabled"</string>
+    <string name="management_title">"Steam management"</string>
+    <string name="management_uninstall">"Uninstall Steam and keep data"</string>
+    <string name="management_uninstall_summary">"Uninstall Steam while keeping app data on this device"</string>
+    <string name="management_uninstall_confirmation">"Steam will close when the uninstall begins. App data will be kept for the current Android user on this device.\n\nReinstall Steam with the same signing certificate to reuse that data. An NPatch-patched build and the official build may have different signatures. This is not a backup and does not guarantee that Steam Guard will remain usable."</string>
+    <string name="management_cancel">"Cancel"</string>
+    <string name="management_confirm">"Uninstall"</string>
+    <string name="management_uninstalling">"Uninstalling…"</string>
+    <string name="management_enable_mode">"Select Shizuku(Sui) in Settings → Working mode and grant access first. Make sure the service is running."</string>
+    <string name="management_service_unavailable">"Could not connect. Start Shizuku or enable Sui, then select Shizuku(Sui) again."</string>
+    <string name="management_permission_waiting">"Waiting for permission. The mode changes only after access is granted."</string>
+    <string name="management_permission_denied">"Access was not granted. Allow Steam in Shizuku or Sui, or select the mode again to retry."</string>
+    <string name="management_uninstall_failed">"The system could not uninstall Steam."</string>
+    <string name="management_result_unknown">"No completion result was received. Check whether Steam is still installed before trying again."</string>
+    <string name="management_uninstall_error">"Could not complete uninstall: %1$s"</string>
+    <string name="module_working_mode_shizuku" translatable="false">"Shizuku(Sui)"</string>
+
+    <!-- maFile -->
+    <string name="mafile_source_import_short">"Imported"</string>
+    <string name="mafile_source_live_short">"Steam"</string>
+    <string name="mafile_title">"maFile import and export"</string>
+    <string name="mafile_summary">"Back up accounts, import maFiles and restore Steam sign-in"</string>
+    <string name="mafile_export_tab">"Export"</string>
+    <string name="mafile_import_tab">"Import"</string>
+    <string name="mafile_source_import">"Imported into Millennium"</string>
+    <string name="mafile_source_live">"Current Steam data"</string>
+    <string name="mafile_no_accounts">"No account data yet. Open Steam Guard or import a maFile."</string>
+    <string name="mafile_plaintext">"Exports contain plaintext credentials. Tap a field to view or copy it."</string>
+    <string name="mafile_restore">"Restore Steam sign-in"</string>
+    <string name="mafile_restore_unavailable">"Sign-in restore is unavailable in this host."</string>
+    <string name="mafile_login_missing">"Restoring sign-in requires a SteamID, account name and mobile refresh token."</string>
+    <string name="mafile_login_expired">"The refresh token has expired or is about to expire. Export a new session from Steam."</string>
+    <string name="mafile_login_invalid">"The tokens are malformed, belong to another account, or are not mobile login tokens."</string>
+    <string name="mafile_login_ready">"Ready to attempt restore. Steam verifies the session online and refreshes the access token if needed."</string>
+    <string name="mafile_import_help">"Choose a single-account plaintext .maFile from Monica or SDA (up to 1 MB). Import into Millennium to view, copy, re-export or restore sign-in."</string>
+    <string name="mafile_choose">"Choose maFile"</string>
+    <string name="mafile_save">"Export file"</string>
+    <string name="mafile_import">"Import account"</string>
+    <string name="mafile_restore_queued">"Restore scheduled. Force stop Steam in Android settings, then reopen it. Returning from the background is not a full restart."</string>
+    <string name="mafile_restore_applied">"The stored login session was restored. Check your login status in Steam; online acceptance has not been verified by Millennium."</string>
+    <string name="mafile_restore_interrupted">"The previous restore was interrupted. It will not be repeated automatically; check Steam before scheduling another restore."</string>
+    <string name="mafile_restore_failed">"Restore failed. Check the account data and host version, then try again. No automatic retry will run."</string>
+    <string name="mafile_cancel_restore">"Cancel scheduled restore"</string>
+    <string name="mafile_undo">"Undo previous restore"</string>
+    <string name="mafile_working">"Working…"</string>
+    <string name="mafile_confirm_title">"Confirm account operation"</string>
+    <string name="mafile_restore_confirm">"Restore sign-in for %1$s (%2$s) at the next full Steam start? This selects that account and replaces its saved login tokens while retaining other accounts. It does not restore the Steam Guard authenticator. A pending restore will be replaced."</string>
+    <string name="mafile_replace_confirm">"Replace the copy of %1$s (%2$s) saved in Millennium with this file?"</string>
+    <string name="mafile_undo_confirm">"Restore the login data saved before the last restore at the next full Steam start? If Steam has since changed that session, undo will stop to preserve those changes."</string>
+    <string name="mafile_cancel">"Cancel"</string>
+    <string name="mafile_confirm">"Confirm"</string>
+    <string name="mafile_copy">"Copy"</string>
+    <string name="mafile_view_copy">"View and copy"</string>
+    <string name="mafile_missing">"Not available"</string>
+    <string name="mafile_present">"Available · tap to view"</string>
+    <string name="mafile_picker_failed">"Could not open the system file picker."</string>
+    <string name="mafile_saved">"File exported."</string>
+    <string name="mafile_read_failed">"Could not read this file. Use a single-account plaintext maFile under 1 MB with consistent account fields and valid secret encoding. ZIP and encrypted backups are not supported."</string>
+    <string name="mafile_write_failed">"Could not finish writing the file. The selected destination may contain a partial file."</string>
+    <string name="mafile_imported">"Imported into Millennium."</string>
+    <string name="mafile_operation_failed">"The operation failed. Your existing imported accounts were retained."</string>
+    <string name="mafile_store_failed">"Could not open the saved accounts. Import and restore are disabled to prevent overwriting them."</string>
 </resources>

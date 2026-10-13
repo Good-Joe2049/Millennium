@@ -10,6 +10,7 @@ internal object SteamModuleSettings {
     private const val PREFS = "millennium_module_settings"
     private const val STEAM_DB_ENABLED = "steamdb_floating_panel_enabled"
     private const val LANGUAGE = "module_language"
+    private const val PRIVILEGED_MODE = "module_privileged_mode"
     private const val LIQUID_GLASS_ENABLED = "module_setting_liquid_glass_enabled"
 
     fun isSteamDbEnabled(context: Context): Boolean =
@@ -38,6 +39,16 @@ internal object SteamModuleSettings {
     fun setLanguage(context: Context, language: ModuleLanguage) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(LANGUAGE, language.tag)
+        }
+    }
+
+    fun isPrivilegedModeEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(PRIVILEGED_MODE, false)
+
+    fun setPrivilegedModeEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(PRIVILEGED_MODE, enabled)
         }
     }
 }

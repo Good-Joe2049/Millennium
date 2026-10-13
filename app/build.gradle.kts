@@ -11,8 +11,8 @@ android {
         applicationId = "com.millennium.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "1.1.0"
+        versionCode = 15
+        versionName = "1.1.3"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.kyant.backdrop)
     implementation(libs.kyant.shapes)
     implementation(libs.zxing.core)
+    implementation(libs.shizuku.api)
     compileOnly("io.github.libxposed:api:102.0.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

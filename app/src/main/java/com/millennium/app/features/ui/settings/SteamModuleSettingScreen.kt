@@ -31,6 +31,13 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import com.millennium.app.R
 import com.millennium.app.features.steamguard.ui.SteamGuardExportEntry
+import com.millennium.app.features.steamguard.ui.SteamMaFileEntry
+import com.millennium.app.features.steammanagement.SteamPrivilegeAccess
+import com.millennium.app.features.steammanagement.ui.SteamManagementCard
+import com.millennium.app.features.steammanagement.ui.SteamWorkingModePreference
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import android.view.ViewTreeObserver
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -69,6 +76,16 @@ internal fun SteamModuleSettingScreen(
     liquidGlassEnabled: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
 ) {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val observer = view.viewTreeObserver
+        val listener = ViewTreeObserver.OnWindowFocusChangeListener(SteamPrivilegeAccess::onWindowFocusChanged)
+        observer.addOnWindowFocusChangeListener(listener)
+        onDispose {
+            if (observer.isAlive) observer.removeOnWindowFocusChangeListener(listener)
+            SteamPrivilegeAccess.cancelRequest()
+        }
+    }
     val tabs = listOf(
         stringResource(R.string.module_general) to R.drawable.ic_module_nav_general,
         stringResource(R.string.module_themes) to R.drawable.ic_module_nav_themes,
@@ -195,6 +212,7 @@ private fun GeneralPage(
             onCheckedChange = onSteamDbEnabledChange,
         )
         SteamGuardExportEntry()
+        SteamMaFileEntry()
     }
     SmallTitle(text = stringResource(R.string.module_appearance))
     Card(
@@ -211,6 +229,7 @@ private fun GeneralPage(
             onCheckedChange = onLiquidGlassEnabledChange,
         )
     }
+    SteamManagementCard()
 }
 
 @Composable
@@ -233,6 +252,7 @@ private fun SettingsPage(onLanguageChange: (ModuleLanguage) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
+        SteamWorkingModePreference()
         OverlayDropdownPreference(
             title = stringResource(R.string.module_language),
             items = listOf(

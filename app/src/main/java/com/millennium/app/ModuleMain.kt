@@ -9,6 +9,9 @@ import android.view.View
 import com.millennium.app.core.SteamRuntimeDiagnostics
 import com.millennium.app.features.steamdb.network.SteamDbConnectionDiagnostics
 import com.millennium.app.features.steamguard.data.SteamGuardStorageHook
+import com.millennium.app.features.steamguard.data.SteamSessionDiagnostics
+import com.millennium.app.features.steamguard.data.SteamLoginRestore
+import com.millennium.app.features.steamguard.export.SteamMaFileDocuments
 import com.millennium.app.features.ui.SteamUiProbeFeature
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
@@ -54,6 +57,7 @@ class ModuleMain : XposedModule() {
     }
 
     private val steamGuardStorageHook = SteamGuardStorageHook(this) { steamContext }
+    private val steamSessionDiagnostics = SteamSessionDiagnostics(this)
     private var lastTouchTargetLogKey: String? = null
     private var lastTouchTargetLogAt = 0L
 
@@ -64,6 +68,12 @@ class ModuleMain : XposedModule() {
 
     override fun onPackageReady(param: PackageReadyParam) {
         if (param.packageName != STEAM_PACKAGE || !param.isFirstPackage) return
+
+        SteamMaFileDocuments.install(this)
+        if (loadedProcess == STEAM_PACKAGE) {
+            runCatching { SteamLoginRestore.install(this, param.classLoader) }
+                .onFailure { log(Log.WARN, "MillenniumMaFile", "restore hook unavailable type=${it.javaClass.simpleName}") }
+        }
 
         moduleApkPath = runCatching { getModuleApplicationInfo().sourceDir }
             .onFailure { log(Log.ERROR, TAG, "module application info unavailable", it) }
@@ -107,6 +117,9 @@ class ModuleMain : XposedModule() {
 
         runCatching { steamGuardStorageHook.install(param.classLoader) }
             .onFailure { log(Log.ERROR, "MillenniumSteamGuard", "storage hook failed", it) }
+
+        runCatching { steamSessionDiagnostics.install(param.classLoader) }
+            .onFailure { log(Log.WARN, "MillenniumSteamSession", "[session] install failed type=${it.javaClass.simpleName}") }
 
     }
 
