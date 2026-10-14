@@ -187,8 +187,6 @@ The floating panel belongs to Steam's own window and does not require Android's 
 - **Historical lows:** SteamDB pricing data for the current store currency and region.
 - **SteamDB rating:** calculated locally from the store page's positive and negative review counts, using the SteamDB formula.
 
-Queries share a request and cache layer built on Android's `HttpURLConnection`. Cronet and its bundled dependencies have been removed to reduce APK size. Data is loaded when the panel is opened or refreshed; successful results are cached briefly, rather than polled continuously in the background.
-
 Availability depends on the upstream services and the current Steam page. Missing fields are shown as unavailable instead of being treated as zero.
 
 <a id="faq"></a>
