@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.millennium.app.R
 import com.millennium.app.features.steamguard.data.SteamGuardData
@@ -36,6 +36,7 @@ import com.millennium.app.features.steamguard.export.SteamMaFile
 import com.millennium.app.features.steamguard.export.SteamMaFileCodec
 import com.millennium.app.features.steamguard.export.SteamMaFileDocuments
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,16 +77,14 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
     val store by SteamMaFileStore.state.collectAsState()
     val documents by SteamMaFileDocuments.state.collectAsState()
     val live = remember(guard, auth) { SteamMaFileCodec.live(guard, auth) }
-    val choices = live.map { "live:${it.key}" to it } + store.accounts.map { "import:${it.key}" to it }
+    val choices = SteamMaFileCodec.accounts(live, store.accounts, store.restored, guard != null)
     var selected by remember { mutableStateOf<String?>(null) }
-    val index = choices.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val account = choices.getOrNull(index)?.second
-    val imported = choices.getOrNull(index)?.first?.startsWith("import:") == true
+    val index = choices.indexOfFirst { it.key == selected }.coerceAtLeast(0)
+    val account = choices.getOrNull(index)
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var ready by remember { mutableStateOf(false) }
     var confirmation by remember { mutableStateOf<String?>(null) }
     var confirmedAccount by remember { mutableStateOf<SteamMaFile?>(null) }
-    var detail by remember { mutableStateOf<Pair<String, String>?>(null) }
     val busy = working || documents.busy
     fun CoroutineScope.work(success: Int, action: () -> Unit, done: () -> Unit = {}) {
         setWorking(true)
@@ -94,14 +93,16 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                 withContext(Dispatchers.IO) { action() }
                 SteamMaFileDocuments.message(success)
                 done()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 SteamMaFileDocuments.message(R.string.mafile_operation_failed)
             } finally { setWorking(false) }
         }
     }
-    fun import(file: SteamMaFile, replace: Boolean) {
-        scope.work(R.string.mafile_imported, { SteamMaFileStore.import(context, file, replace) }) {
-            selected = "import:${file.key}"
+    fun import(file: SteamMaFile) {
+        scope.work(R.string.mafile_imported, { SteamLoginRestore.import(context, file) }) {
+            selected = file.key
             tab = 0
         }
     }
@@ -123,31 +124,18 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                 } else {
                     if (choices.size > 1) OverlayDropdownPreference(
                         title = stringResource(R.string.guard_account),
-                        items = choices.map { (key, value) ->
-                            "${value.accountName.ifEmpty { value.steamId }} · " + stringResource(
-                                if (key.startsWith("import:")) R.string.mafile_source_import_short else R.string.mafile_source_live_short)
-                        }, selectedIndex = index, insideMargin = PaddingValues(vertical = 4.dp),
-                        onSelectedIndexChange = { if (!busy) selected = choices[it].first },
+                        items = choices.map { it.accountName.ifEmpty { it.steamId } },
+                        selectedIndex = index, insideMargin = PaddingValues(vertical = 4.dp),
+                        onSelectedIndexChange = { if (!busy) selected = choices[it].key },
                     )
-                    Note(stringResource(if (imported) R.string.mafile_source_import else R.string.mafile_source_live))
-                    AccountDetails(account) { detail = it }
-                    Note(stringResource(R.string.mafile_plaintext))
-                    if (imported) {
-                        HorizontalDivider()
-                        val issue = SteamMaFileCodec.loginIssue(account)
-                        Note(stringResource(when {
-                            !SteamLoginRestore.available -> R.string.mafile_restore_unavailable
-                            issue == SteamMaFileCodec.LoginIssue.Missing -> R.string.mafile_login_missing
-                            issue == SteamMaFileCodec.LoginIssue.Expired -> R.string.mafile_login_expired
-                            issue == SteamMaFileCodec.LoginIssue.Invalid -> R.string.mafile_login_invalid
-                            else -> R.string.mafile_login_ready
-                        }))
-                        TextButton(
-                            text = stringResource(R.string.mafile_restore), modifier = Modifier.fillMaxWidth(),
-                            enabled = ready && !busy && issue == null && SteamLoginRestore.available,
-                            onClick = { confirmedAccount = account; confirmation = "restore" },
-                        )
-                    }
+                    AccountDetails(account)
+                    HorizontalDivider()
+                    RestoreDetails(account)
+                    TextButton(
+                        text = stringResource(R.string.mafile_restore), modifier = Modifier.fillMaxWidth(),
+                        enabled = ready && !busy && SteamLoginRestore.canRestore(account),
+                        onClick = { confirmedAccount = account; confirmation = "restore" },
+                    )
                 }
             } else {
                 Note(stringResource(R.string.mafile_import_help))
@@ -155,13 +143,15 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                     enabled = !busy, modifier = Modifier.fillMaxWidth())
                 documents.preview?.let { preview ->
                     Note(documents.name)
-                    AccountDetails(preview) { detail = it }
+                    AccountDetails(preview)
+                    RestoreDetails(preview)
                 }
             }
             if (store.restore.isNotEmpty()) {
                 Note(stringResource(when (store.restore) {
                     "queued" -> R.string.mafile_restore_queued
                     "applied" -> R.string.mafile_restore_applied
+                    "saved" -> R.string.mafile_restore_saved
                     "applying", "interrupted" -> R.string.mafile_restore_interrupted
                     else -> R.string.mafile_restore_failed
                 }))
@@ -186,10 +176,7 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                 text = stringResource(if (tab == 0) R.string.mafile_save else R.string.mafile_import),
                 onClick = {
                     if (tab == 0) account?.let { SteamMaFileDocuments.save(context, it) }
-                    else documents.preview?.let { file ->
-                        if (store.accounts.any { it.key == file.key }) { confirmedAccount = file; confirmation = "replace" }
-                        else import(file, false)
-                    }
+                    else documents.preview?.let(::import)
                 },
                 enabled = !busy && if (tab == 0) account != null else ready && documents.preview != null,
                 modifier = Modifier.weight(1.5f), colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -201,7 +188,7 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
         Note(stringResource(when (confirmation) {
             "restore" -> R.string.mafile_restore_confirm
             "undo" -> R.string.mafile_undo_confirm
-            else -> R.string.mafile_replace_confirm
+            else -> R.string.mafile_restore_confirm
         }, confirmedAccount?.accountName.orEmpty(), confirmedAccount?.steamId.orEmpty()))
         Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(text = stringResource(R.string.mafile_cancel), onClick = { confirmation = null; confirmedAccount = null }, modifier = Modifier.weight(1f))
@@ -212,24 +199,30 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                 when (action) {
                     "restore" -> if (file != null) scope.work(0, { SteamLoginRestore.schedule(context, file) })
                     "undo" -> scope.work(0, { SteamLoginRestore.undo(context) })
-                    "replace" -> if (file != null) import(file, true)
                 }
-            })
-        }
-    }
-    OverlayDialog(show = detail != null, title = detail?.first.orEmpty(), largeScreen = true, onDismissRequest = { detail = null }) {
-        SelectionContainer { Text(detail?.second.orEmpty(), modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) }
-        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(text = stringResource(R.string.module_close), onClick = { detail = null }, modifier = Modifier.weight(1f))
-            TextButton(text = stringResource(R.string.mafile_copy), modifier = Modifier.weight(1f), onClick = {
-                detail?.let { SteamGuardClipboard.copy(context, it.first, it.second) }
             })
         }
     }
 }
 
 @Composable
-private fun AccountDetails(account: SteamMaFile, show: (Pair<String, String>) -> Unit) {
+private fun RestoreDetails(account: SteamMaFile) {
+    val guard = SteamMaFileCodec.canRestoreGuard(account)
+    val issue = SteamMaFileCodec.loginIssue(account)
+    Note(stringResource(when {
+        !SteamLoginRestore.available || (guard && !SteamLoginRestore.guardAvailable) -> R.string.mafile_restore_unavailable
+        guard && issue == null -> R.string.mafile_guard_login_ready
+        guard -> R.string.mafile_guard_only_ready
+        issue == SteamMaFileCodec.LoginIssue.Missing -> R.string.mafile_login_missing
+        issue == SteamMaFileCodec.LoginIssue.Expired -> R.string.mafile_login_expired
+        issue == SteamMaFileCodec.LoginIssue.Invalid -> R.string.mafile_login_invalid
+        else -> R.string.mafile_login_ready
+    }))
+}
+
+@Composable
+private fun AccountDetails(account: SteamMaFile) {
+    val context = LocalContext.current
     val root = remember(account.json) { JSONObject(account.json) }
     Column(Modifier.fillMaxWidth()) {
         listOf("account_name", "steamid", "shared_secret", "identity_secret", "device_id", "revocation_code", "access_token", "refresh_token").forEach { key ->
@@ -240,12 +233,14 @@ private fun AccountDetails(account: SteamMaFile, show: (Pair<String, String>) ->
                 else -> key
             }
             Row(Modifier.fillMaxWidth().heightIn(min = 44.dp)
-                .clickable(enabled = value.isNotEmpty(), role = Role.Button, onClickLabel = stringResource(R.string.mafile_view_copy)) { show(label to value) }
+                .clickable(enabled = value.isNotEmpty(), role = Role.Button, onClickLabel = stringResource(R.string.mafile_copy)) {
+                    SteamGuardClipboard.copy(context, label, value)
+                }
                 .padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(label, modifier = Modifier.weight(0.8f), style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                Text(if (value.isEmpty()) stringResource(R.string.mafile_missing)
-                else if (key == "account_name" || key == "steamid") value else stringResource(R.string.mafile_present),
-                    modifier = Modifier.weight(1.2f), style = MiuixTheme.textStyles.body2)
+                Text(value.ifEmpty { stringResource(R.string.mafile_missing) },
+                    modifier = Modifier.weight(1.2f), style = MiuixTheme.textStyles.body2,
+                    maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
             }
         }
     }

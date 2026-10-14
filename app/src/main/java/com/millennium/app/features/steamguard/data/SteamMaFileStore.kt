@@ -18,23 +18,16 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** Module-owned data inside the host sandbox, excluded from Android backups. Call on IO. */
 internal object SteamMaFileStore {
-    data class State(val accounts: List<SteamMaFile> = emptyList(), val restore: String = "", val canUndo: Boolean = false)
+    data class State(
+        val accounts: List<SteamMaFile> = emptyList(), val restore: String = "", val canUndo: Boolean = false,
+        val restored: Set<String> = emptySet(),
+    )
     private val current = MutableStateFlow(State())
     val state = current.asStateFlow()
     private const val KEY = "millennium.mafile.v1"
 
     @Synchronized
     fun load(context: Context) { publish(read(context)) }
-
-    @Synchronized
-    fun import(context: Context, account: SteamMaFile, replace: Boolean) {
-        val root = read(context)
-        val accounts = root.optJSONObject("accounts") ?: JSONObject()
-        check(replace || !accounts.has(account.key))
-        accounts.put(account.key, JSONObject(account.json))
-        root.put("accounts", accounts)
-        write(context, root)
-    }
 
     @Synchronized
     fun update(context: Context, change: (JSONObject) -> Unit) {
@@ -80,6 +73,7 @@ internal object SteamMaFileStore {
             accounts.keys().asSequence().map { SteamMaFileCodec.parse(accounts.getJSONObject(it).toString()) }.toList(),
             root.optString("restore_status", ""),
             root.has("login_backup"),
+            root.optJSONObject("restored_accounts")?.keys()?.asSequence()?.toSet().orEmpty(),
         )
     }
 

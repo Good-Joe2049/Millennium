@@ -152,6 +152,29 @@ internal object SteamMaFileCodec {
 
     enum class LoginIssue { Missing, Invalid, Expired }
 
+    fun canRestoreGuard(file: SteamMaFile): Boolean =
+        (file.steamId.toLongOrNull() ?: 0L) in 76561197960265728L..76561202255233023L &&
+                file.accountName.isNotEmpty() && file.sharedSecret.isNotEmpty()
+
+    /** One account per SteamID; a newly imported file replaces the entire matching record. */
+    fun accounts(live: List<SteamMaFile>, imported: List<SteamMaFile>, restored: Set<String> = emptySet(), guardLoaded: Boolean = true): List<SteamMaFile> {
+        val merged = (live + imported).associateByTo(linkedMapOf(), SteamMaFile::key)
+        live.filter { it.key in restored && (guardLoaded || merged[it.key]?.sharedSecret.isNullOrEmpty()) }
+            .forEach { merged[it.key] = it }
+        return merged.values.toList()
+    }
+
+    fun mergeGuard(existing: String?, file: SteamMaFile): String {
+        require(canRestoreGuard(file))
+        val root = existing?.let(::JSONObject) ?: JSONObject().put("accounts", JSONObject())
+        val accounts = root.getJSONObject("accounts")
+        // Replace, rather than mixing a new shared_secret with stale identity_secret/token_gid.
+        val account = JSONObject(file.json)
+        listOf("Session", "session", "uri", "otp_uri", "otpauth_uri").forEach(account::remove)
+        accounts.put(file.steamId, account)
+        return root.toString()
+    }
+
     /** Claims are local consistency checks, never proof of signature or server acceptance. */
     fun loginIssue(file: SteamMaFile, now: Long = System.currentTimeMillis() / 1000): LoginIssue? {
         if (file.steamId.isEmpty() || file.accountName.isEmpty() || file.refreshToken.isEmpty())
@@ -179,7 +202,7 @@ internal object SteamMaFileCodec {
         require(loginIssue(file) == null)
         val root = existing?.let(::JSONObject) ?: JSONObject().put("userContexts", JSONObject())
         val users = root.getJSONObject("userContexts")
-        val user = users.optJSONObject(file.steamId) ?: JSONObject()
+        val user = JSONObject()
         user.put("accountName", file.accountName).put("accessToken", file.accessToken.ifEmpty { null } ?: JSONObject.NULL)
             .put("refreshToken", file.refreshToken)
         users.put(file.steamId, user)
