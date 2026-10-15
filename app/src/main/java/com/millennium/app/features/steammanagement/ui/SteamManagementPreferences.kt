@@ -22,6 +22,7 @@ import com.millennium.app.R
 import com.millennium.app.core.ModuleLocalization
 import com.millennium.app.features.steammanagement.SteamKeepDataUninstall
 import com.millennium.app.features.steammanagement.SteamPrivilegeAccess
+import com.millennium.app.features.ui.settings.SteamWorkingMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -38,8 +39,10 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun SteamWorkingModePreference() {
     val access = SteamPrivilegeAccess
     val status = when {
+        access.requestingMode == SteamWorkingMode.Root -> null
         access.requesting -> R.string.management_permission_waiting
         access.message != null -> access.message
+        access.mode == SteamWorkingMode.Root && !access.ready -> R.string.management_root_unavailable
         access.enabled && !access.ready -> R.string.management_service_unavailable
         else -> null
     }
@@ -49,9 +52,10 @@ internal fun SteamWorkingModePreference() {
         items = listOf(
             stringResource(R.string.module_working_mode_disabled),
             stringResource(R.string.module_working_mode_shizuku),
+            stringResource(R.string.module_working_mode_root),
         ),
-        selectedIndex = if (access.enabled) 1 else 0,
-        onSelectedIndexChange = { access.selectMode(it == 1) },
+        selectedIndex = access.mode.ordinal,
+        onSelectedIndexChange = { access.selectMode(SteamWorkingMode.entries[it]) },
     )
 }
 
@@ -71,8 +75,7 @@ internal fun SteamManagementCard() {
             summary = stringResource(R.string.management_uninstall_summary),
             holdDownState = holdDown,
             onClick = {
-                SteamPrivilegeAccess.refresh()
-                if (SteamPrivilegeAccess.ready) {
+                if (SteamPrivilegeAccess.ready && !SteamPrivilegeAccess.requesting) {
                     error = null
                     showDialog = true
                     holdDown = true
@@ -129,7 +132,6 @@ internal fun SteamManagementCard() {
                             error = null
                             scope.launch {
                                 try {
-                                    SteamPrivilegeAccess.refresh()
                                     SteamKeepDataUninstall.execute(context)
                                     showDialog = false
                                 } catch (cancelled: CancellationException) {

@@ -11,8 +11,8 @@ android {
         applicationId = "com.millennium.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 16
-        versionName = "1.1.5"
+        versionCode = 21
+        versionName = "1.2.0"
 
         ndk {
             abiFilters += "arm64-v8a"

@@ -20,6 +20,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
+import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -28,13 +29,17 @@ import android.widget.ImageView
 import android.content.res.ColorStateList
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import com.millennium.app.features.steamdb.ui.SteamDbUi
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.content.res.ResourcesCompat
 import com.millennium.app.R
 import com.millennium.app.features.steamdb.SteamDbPanelController
+import com.millennium.app.features.steamdb.data.SteamStorePageReader
+import com.millennium.app.features.ui.menu.SteamMainMenuSettingLayout
 import com.millennium.app.features.ui.settings.SteamModuleSettings
+import java.lang.reflect.Method
 import java.util.IdentityHashMap
 import java.util.WeakHashMap
 import kotlin.math.min
@@ -52,6 +57,7 @@ internal class SteamFloatingPanelFeature(
     private val observedUrls = WeakHashMap<WebView, String>()
     private val injectedUrls = WeakHashMap<WebView, String>()
     private val floatingStates = IdentityHashMap<Activity, FloatingState>()
+    private val pointerEventsGetters = HashMap<Class<*>, Method?>()
     private val moduleResourcesLock = Any()
     @Volatile
     private var moduleApkPath: String? = null
@@ -82,10 +88,11 @@ internal class SteamFloatingPanelFeature(
         val decor = activity.window?.decorView as? ViewGroup ?: return
         val current = floatingStates[activity]
         if (current != null && current.root.parent === decor) return
-        current?.root?.let { (it.parent as? ViewGroup)?.removeView(it) }
+        if (current != null) detach(activity)
 
         val root = FrameLayout(activity).apply {
             tag = ROOT_TAG
+            visibility = View.INVISIBLE
             clipChildren = false
             clipToPadding = false
             isClickable = false
@@ -133,9 +140,15 @@ internal class SteamFloatingPanelFeature(
         }
         state = FloatingState(activity, root, scrim, card, bubble, panel, sharedIcon, statsPanel)
         floatingStates[activity] = state
+        state.pageListener = ViewTreeObserver.OnPreDrawListener {
+            updatePageVisibility(state, decor)
+            true
+        }
+        decor.viewTreeObserver.addOnPreDrawListener(state.pageListener)
         scrim.setOnClickListener { collapse(state) }
         installBubbleTouch(state)
         root.post {
+            if (floatingStates[activity] !== state) return@post
             placeBubble(state)
             positionSharedIcon(state, opening = false, progress = 1f)
             refreshSharedIcon(state)
@@ -147,6 +160,8 @@ internal class SteamFloatingPanelFeature(
             state.card.invalidateOutline()
             state.card.clipToOutline = true
             state.sharedIcon.bringToFront()
+            state.ready = true
+            decor.invalidate()
             logIconLayout(state, "attached")
             val params = state.card.layoutParams as? FrameLayout.LayoutParams
             emit(
@@ -168,6 +183,60 @@ internal class SteamFloatingPanelFeature(
         floatingStates.keys.toList().forEach(::detach)
     }
 
+    private fun updatePageVisibility(state: FloatingState, decor: ViewGroup) {
+        if (!state.ready) return
+        val bounds = state.pageBounds
+        val page = if (decor.getGlobalVisibleRect(bounds)) {
+            findPageViewAt(decor, bounds.centerX(), bounds.centerY(), bounds) as? WebView
+        } else null
+        val appId = SteamStorePageReader.appId(page?.url)
+        if (page != null && appId != null) {
+            // Keep the data panel bound to this foreground page, including same-WebView navigation.
+            steamDbPanelController.observe(page)
+            state.root.isVisible = true
+        } else if (state.root.isVisible) {
+            state.root.visibility = View.INVISIBLE
+            // Finish existing transitions while hidden, then reuse the normal collapse cleanup.
+            state.animator?.end()
+            if (state.expanded) {
+                collapse(state)
+                state.animator?.end()
+            }
+            state.dragging = false
+            steamDbPanelController.close(state.statsPanel)
+        }
+    }
+
+    private fun findPageViewAt(view: View, x: Int, y: Int, bounds: Rect): View? {
+        if (view.tag == ROOT_TAG || view.tag == SteamMainMenuSettingLayout.ROOT_TAG ||
+            view.visibility != View.VISIBLE || view.alpha <= 0f ||
+            !view.getGlobalVisibleRect(bounds) || !bounds.contains(x, y)
+        ) return null
+        // Steam's ToastManager and loading bar fill the page but use pointerEvents=NONE.
+        // Respect React Native's pass-through modes instead of treating their bounds as a page.
+        val pointerEvents = pointerEvents(view)
+        if (pointerEvents == "NONE") return null
+        if (view is WebView) return view
+        // ponytail: Steam's full-page WebView covers the window center; use navigation hooks
+        // if Steam adopts split panes. A foreground native page must block a cached WebView.
+        if (view is ViewGroup && pointerEvents != "BOX_ONLY") {
+            for (index in view.childCount - 1 downTo 0) {
+                findPageViewAt(view.getChildAt(index), x, y, bounds)?.let { return it }
+            }
+        }
+        return view.takeUnless { pointerEvents == "BOX_NONE" }
+    }
+
+    private fun pointerEvents(view: View): String? {
+        val type = view.javaClass
+        if (!pointerEventsGetters.containsKey(type)) {
+            // React Native belongs to the host; also cache misses for ordinary Android views.
+            pointerEventsGetters[type] = runCatching { type.getMethod("getPointerEvents") }.getOrNull()
+        }
+        val getter = pointerEventsGetters[type] ?: return null
+        return runCatching { (getter.invoke(view) as? Enum<*>)?.name }.getOrNull()
+    }
+
     fun detach(activity: Activity) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post { detach(activity) }
@@ -175,7 +244,9 @@ internal class SteamFloatingPanelFeature(
         }
         steamDbPanelController.detach(activity)
         val state = floatingStates.remove(activity) ?: return
-        if (!state.expanded) saveBubblePosition(state)
+        (state.root.parent as? ViewGroup)?.viewTreeObserver?.takeIf { it.isAlive }
+            ?.removeOnPreDrawListener(state.pageListener)
+        if (state.ready && !state.expanded) saveBubblePosition(state)
         state.animator?.cancel()
         (state.root.parent as? ViewGroup)?.removeView(state.root)
         emit(Log.DEBUG, "floating bubble detached activity=${activity.javaClass.name}")
@@ -184,7 +255,6 @@ internal class SteamFloatingPanelFeature(
     fun observe(webView: WebView) {
         if (!SteamModuleSettings.isSteamDbEnabled(webView.context)) return
         val url = webView.url.orEmpty()
-        steamDbPanelController.observe(webView)
         if (observedUrls[webView] == url) return
         observedUrls[webView] = url
         val host = runCatching { url.toUri().host?.lowercase() }.getOrNull()
@@ -702,6 +772,9 @@ internal class SteamFloatingPanelFeature(
         val sharedIcon: ImageView,
         val statsPanel: SteamDbPanelController.Panel,
     ) {
+        lateinit var pageListener: ViewTreeObserver.OnPreDrawListener
+        val pageBounds = Rect()
+        var ready = false
         var animator: ValueAnimator? = null
         var expanded = false
         var dragging = false

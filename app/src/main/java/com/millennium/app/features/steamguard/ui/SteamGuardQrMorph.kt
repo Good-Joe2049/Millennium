@@ -35,7 +35,10 @@ internal fun SteamGuardQrMorph(
     format: SteamGuardQrFormat,
     modifier: Modifier = Modifier,
 ) {
-    val target = if (format == SteamGuardQrFormat.Stratum) 0f else 1f
+    val target = when (format) {
+        SteamGuardQrFormat.Stratum, SteamGuardQrFormat.Monica -> 0f
+        SteamGuardQrFormat.Aegis -> 1f
+    }
     val progress = remember(codes) { Animatable(target) }
     val renderer = remember(codes) { SteamGuardQrMorphRenderer(codes) }
     val accentColor = MiuixTheme.colorScheme.primary.toArgb()

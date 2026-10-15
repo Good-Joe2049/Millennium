@@ -15,7 +15,8 @@ internal enum class SteamGuardQrFormat(
     val packageName: String,
 ) {
     Stratum("Stratum", "otpauth://totp/Steam:", "com.stratumauth.app"),
-    Aegis("Aegis", "otpauth://steam/", "com.beemdevelopment.aegis");
+    Aegis("Aegis", "otpauth://steam/", "com.beemdevelopment.aegis"),
+    Monica("Monica", "otpauth://totp/Steam:", "takagi.ru.monica");
 
     fun createUri(account: SteamGuardAccount): Uri {
         require(account.username.isNotBlank() && account.secret.isNotBlank())
@@ -30,7 +31,9 @@ internal data class SteamGuardQrPair(val stratum: BitMatrix, val aegis: BitMatri
 
 internal object SteamGuardQrCode {
     fun createPair(account: SteamGuardAccount): SteamGuardQrPair {
-        val uris = SteamGuardQrFormat.entries.map { it.createUri(account).toString() }
+        // Monica uses the same URI and QR code as Stratum; only two matrices are needed.
+        val uris = listOf(SteamGuardQrFormat.Stratum, SteamGuardQrFormat.Aegis)
+            .map { it.createUri(account).toString() }
         val writer = QRCodeWriter()
         val hints = mapOf(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,

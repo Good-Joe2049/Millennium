@@ -18,6 +18,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.millennium.app.R
 import com.millennium.app.features.ui.settings.SteamModuleSettings
+import com.millennium.app.features.ui.settings.SteamWorkingMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import moe.shizuku.server.IShizukuService
 import rikka.shizuku.Shizuku
 import rikka.sui.Sui
@@ -26,20 +32,25 @@ import rikka.sui.Sui
 internal object SteamPrivilegeAccess {
     private const val MANAGER_PACKAGE = "moe.shizuku.privileged.api"
     private val main = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var application: Application? = null
+    private var rootJob: Job? = null
     private var requestSequence = 4100
     private var pendingCode: Int? = null
     private var connectionGeneration = 0
     private var connecting = false
     private var suiAttempted = false
     private var focusLostRequest: Int? = null
+    private var permissionSentCode: Int? = null
 
-    var enabled by mutableStateOf(false)
+    var mode by mutableStateOf(SteamWorkingMode.Disabled)
         private set
+    val enabled: Boolean get() = mode != SteamWorkingMode.Disabled
     var ready by mutableStateOf(false)
         private set
-    var requesting by mutableStateOf(false)
+    var requestingMode by mutableStateOf<SteamWorkingMode?>(null)
         private set
+    val requesting: Boolean get() = requestingMode != null
     var message by mutableStateOf<Int?>(null)
         private set
 
@@ -49,56 +60,70 @@ internal object SteamPrivilegeAccess {
             return
         }
         application = host.applicationContext as Application
-        enabled = SteamModuleSettings.isPrivilegedModeEnabled(host)
+        mode = SteamModuleSettings.workingMode(host)
         Shizuku.addBinderReceivedListenerSticky {
-            connecting = false
-            onConnected()
+            main.post {
+                connecting = false
+                onConnected()
+            }
         }
         Shizuku.addBinderDeadListener {
-            connecting = false
-            suiAttempted = false
-            connectionGeneration++
-            ready = false
-            cancelRequest()
-            message = R.string.management_service_unavailable
-        }
-        Shizuku.addRequestPermissionResultListener { code, result ->
-            if (code == pendingCode) {
-                cancelRequest()
-                if (result == PackageManager.PERMISSION_GRANTED && hasPermission()) {
-                    saveMode(true)
-                    ready = true
-                    message = null
-                } else {
-                    saveMode(false)
-                    message = R.string.management_permission_denied
+            main.post {
+                connecting = false
+                suiAttempted = false
+                connectionGeneration++
+                if (mode == SteamWorkingMode.Shizuku) ready = false
+                if (requestingMode == SteamWorkingMode.Shizuku) {
+                    cancelRequest()
+                    message = R.string.management_service_unavailable
+                } else if (mode == SteamWorkingMode.Shizuku && !requesting) {
+                    message = R.string.management_service_unavailable
                 }
             }
         }
-        if (enabled) connect()
+        Shizuku.addRequestPermissionResultListener { code, result ->
+            main.post {
+                if (requestingMode == SteamWorkingMode.Shizuku && code == pendingCode) {
+                    finishRequest(
+                        SteamWorkingMode.Shizuku,
+                        result == PackageManager.PERMISSION_GRANTED && hasPermission(),
+                        R.string.management_permission_denied,
+                    )
+                }
+            }
+        }
+        refresh()
     }
 
-    fun selectMode(usePrivilege: Boolean) {
+    fun selectMode(value: SteamWorkingMode) {
         if (application == null) return
         cancelRequest()
         message = null
-        if (!usePrivilege) {
-            saveMode(false)
-            return
+        when (value) {
+            SteamWorkingMode.Disabled -> saveMode(value)
+            SteamWorkingMode.Root -> requestRoot()
+            SteamWorkingMode.Shizuku -> {
+                pendingCode = ++requestSequence
+                requestingMode = value
+                // Keep the previous mode until the requested permission has been verified.
+                connect()
+            }
         }
-        pendingCode = ++requestSequence
-        requesting = true
-        // Never optimistically select or save Shizuku(Sui).
-        connect()
     }
 
     fun cancelRequest() {
+        rootJob?.cancel()
+        rootJob = null
         pendingCode = null
         focusLostRequest = null
-        requesting = false
+        permissionSentCode = null
+        requestingMode = null
+        connecting = false
+        connectionGeneration++
     }
 
     fun onWindowFocusChanged(hasFocus: Boolean) {
+        if (requestingMode != SteamWorkingMode.Shizuku) return
         val code = pendingCode ?: return
         if (!hasFocus) {
             focusLostRequest = code
@@ -106,35 +131,73 @@ internal object SteamPrivilegeAccess {
             // Some permission UIs dismiss without sending a result. Reconcile on return,
             // allowing the ordinary permission callback to arrive first.
             main.postDelayed({
-                if (pendingCode == code && focusLostRequest == code) {
-                    val granted = hasPermission()
-                    cancelRequest()
-                    saveMode(granted)
-                    ready = granted
-                    message = if (granted) null else R.string.management_permission_denied
+                if (requestingMode == SteamWorkingMode.Shizuku && pendingCode == code && focusLostRequest == code) {
+                    finishRequest(SteamWorkingMode.Shizuku, hasPermission(), R.string.management_permission_denied)
                 }
             }, 300)
         }
     }
 
     fun refresh() {
-        if (application == null) return
-        if (binderReady()) {
-            ready = enabled && hasPermission()
-            if (enabled && !ready) {
-                saveMode(false)
-                message = R.string.management_permission_denied
+        if (application == null || requesting) return
+        when (mode) {
+            SteamWorkingMode.Disabled -> ready = false
+            SteamWorkingMode.Root -> requestRoot()
+            SteamWorkingMode.Shizuku -> {
+                if (binderReady()) {
+                    ready = hasPermission()
+                    if (ready) {
+                        message = null
+                    } else {
+                        saveMode(SteamWorkingMode.Disabled)
+                        message = R.string.management_permission_denied
+                    }
+                } else {
+                    ready = false
+                    if (!connecting) connect()
+                }
             }
-        } else {
-            ready = false
-            if (enabled && !connecting) connect()
         }
     }
 
-    private fun saveMode(value: Boolean) {
-        enabled = value
-        if (!value) ready = false
-        application?.let { SteamModuleSettings.setPrivilegedModeEnabled(it, value) }
+    private fun saveMode(value: SteamWorkingMode) {
+        mode = value
+        if (value == SteamWorkingMode.Disabled) ready = false
+        application?.let { SteamModuleSettings.setWorkingMode(it, value) }
+    }
+
+    private fun requestRoot() {
+        val host = application ?: return
+        val code = ++requestSequence
+        pendingCode = code
+        requestingMode = SteamWorkingMode.Root
+        message = null
+        rootJob = scope.launch {
+            val result = SteamRootShell.probe(host.cacheDir)
+            // Cancellation or a newer selection must never be overwritten by an old result.
+            if (pendingCode != code || requestingMode != SteamWorkingMode.Root) return@launch
+            rootJob = null
+            val error = when (result) {
+                SteamRootShell.Access.Granted -> null
+                SteamRootShell.Access.Unavailable -> R.string.management_root_unavailable
+                SteamRootShell.Access.Denied -> R.string.management_root_denied
+                SteamRootShell.Access.NotRoot -> R.string.management_root_not_root
+                SteamRootShell.Access.TimedOut -> R.string.management_root_timeout
+            }
+            finishRequest(SteamWorkingMode.Root, result == SteamRootShell.Access.Granted, error)
+        }
+    }
+
+    private fun finishRequest(target: SteamWorkingMode, granted: Boolean, error: Int?) {
+        cancelRequest()
+        if (granted) {
+            saveMode(target)
+            ready = true
+            message = null
+        } else {
+            if (mode == target) saveMode(SteamWorkingMode.Disabled)
+            message = error
+        }
     }
 
     private fun binderReady(): Boolean = runCatching {
@@ -151,26 +214,19 @@ internal object SteamPrivilegeAccess {
 
     private fun onConnected() {
         if (!binderReady()) return
-        message = null
-        ready = enabled && hasPermission()
-        val code = pendingCode
-        if (code == null) {
-            if (enabled && !ready) {
-                saveMode(false)
-                message = R.string.management_permission_denied
-            }
+        if (requestingMode != SteamWorkingMode.Shizuku) {
+            if (mode == SteamWorkingMode.Shizuku && !requesting) refresh()
             return
         }
+        val code = pendingCode ?: return
         if (hasPermission()) {
-            cancelRequest()
-            saveMode(true)
-            ready = true
-        } else {
+            finishRequest(SteamWorkingMode.Shizuku, true, null)
+        } else if (permissionSentCode != code) {
             try {
                 if (Shizuku.shouldShowRequestPermissionRationale()) {
-                    cancelRequest()
-                    message = R.string.management_permission_denied
+                    finishRequest(SteamWorkingMode.Shizuku, false, R.string.management_permission_denied)
                 } else {
+                    permissionSentCode = code
                     Shizuku.requestPermission(code)
                 }
             } catch (error: Exception) {
@@ -243,8 +299,12 @@ internal object SteamPrivilegeAccess {
         if (error != null) Log.w("MillenniumSteamManagement", "Privilege connection failed", error)
         connecting = false
         connectionGeneration++
-        ready = false
-        cancelRequest()
-        message = R.string.management_service_unavailable
+        if (mode == SteamWorkingMode.Shizuku) ready = false
+        if (requestingMode == SteamWorkingMode.Shizuku) {
+            cancelRequest()
+            message = R.string.management_service_unavailable
+        } else if (mode == SteamWorkingMode.Shizuku && !requesting) {
+            message = R.string.management_service_unavailable
+        }
     }
 }

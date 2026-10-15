@@ -17,6 +17,7 @@ import android.view.ViewParent
 import android.widget.TextView
 import android.webkit.WebView
 import com.millennium.app.features.ui.floating.SteamFloatingPanelFeature
+import com.millennium.app.features.ui.glass.SteamBottomBarGlassFeature
 import com.millennium.app.features.ui.menu.SteamMainMenuSettingFeature
 import com.millennium.app.features.ui.settings.SteamModuleSettingFeature
 import java.util.IdentityHashMap
@@ -32,6 +33,7 @@ internal class SteamUiProbeFeature(
     private val activityStates = IdentityHashMap<Activity, ActivityState>()
     private val reactNativeTagIdsByLoader = WeakHashMap<ClassLoader, Map<String, Int>>()
     private val floatingPanelFeature = SteamFloatingPanelFeature(emit)
+    private val bottomBarGlassFeature = SteamBottomBarGlassFeature(emit)
     private val moduleSettingFeature = SteamModuleSettingFeature(
         emit = emit,
         onLanguageChanged = { activity ->
@@ -170,6 +172,7 @@ internal class SteamUiProbeFeature(
             touchInterceptionEnabled.set(false)
             floatingPanelFeature.attach(activity)
             menuSettingFeature.attach(activity)
+            bottomBarGlassFeature.update(activity)
             moduleSettingFeature.resume(activity)
             attachLayoutProbe(activity)
             startPolling(activity)
@@ -181,6 +184,7 @@ internal class SteamUiProbeFeature(
                 // Keep the settings window and its selected tab while Steam is in the background.
                 menuSettingFeature.detach(activity)
                 floatingPanelFeature.detach(activity)
+                bottomBarGlassFeature.detach(activity)
             }
             stopPolling(activity)
         }
@@ -199,6 +203,7 @@ internal class SteamUiProbeFeature(
         override fun onActivityDestroyed(activity: Activity) {
             if (activity.packageName == STEAM_PACKAGE) {
                 moduleSettingFeature.detach(activity)
+                bottomBarGlassFeature.detach(activity)
                 menuSettingFeature.detach(activity)
                 floatingPanelFeature.detach(activity)
             }
@@ -271,6 +276,7 @@ internal class SteamUiProbeFeature(
     }
 
     private fun dumpVisibleTree(activity: Activity, state: ActivityState, reason: String) {
+        bottomBarGlassFeature.update(activity)
         val nodes = ArrayList<NodeDescription>(MAX_NODES)
         collectVisibleNodes(state.decorView, 0, nodes)
         val signature = nodes.joinToString("|") { it.signature }

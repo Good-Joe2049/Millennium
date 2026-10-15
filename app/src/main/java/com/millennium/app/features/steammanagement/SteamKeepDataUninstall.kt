@@ -8,16 +8,19 @@ import android.os.Process
 import android.os.ResultReceiver
 import com.millennium.app.R
 import com.millennium.app.core.ModuleLocalization
+import com.millennium.app.features.ui.settings.SteamWorkingMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
-/** Executes the package manager's shell command in system_server via Shizuku/Sui. */
+/** Keeps data for the current Android user, using the selected and authorized backend. */
 internal object SteamKeepDataUninstall {
     private const val STEAM_PACKAGE = "com.valvesoftware.android.steam.community"
     // Android IBinder's stable '_CMD' transaction; hidden in the public SDK.
@@ -25,8 +28,13 @@ internal object SteamKeepDataUninstall {
 
     suspend fun execute(context: Context): Unit = withContext(Dispatchers.IO) {
         check(context.packageName == STEAM_PACKAGE) { "This action is only available inside Steam" }
-        check(SteamPrivilegeAccess.enabled && SteamPrivilegeAccess.ready) {
+        val mode = SteamPrivilegeAccess.mode
+        check(mode != SteamWorkingMode.Disabled && SteamPrivilegeAccess.ready && !SteamPrivilegeAccess.requesting) {
             ModuleLocalization.text(context, R.string.management_enable_mode)
+        }
+        if (mode == SteamWorkingMode.Root) {
+            uninstallWithRoot(context)
+            return@withContext
         }
         val packageService = checkNotNull(SystemServiceHelper.getSystemService("package"))
         val pipe = ParcelFileDescriptor.createPipe()
@@ -80,6 +88,24 @@ internal object SteamKeepDataUninstall {
         val details = output.await()
         check(exitCode == 0) {
             details.ifBlank { ModuleLocalization.text(context, R.string.management_uninstall_failed) }
+        }
+    }
+
+    private suspend fun uninstallWithRoot(context: Context) {
+        val result = try {
+            SteamRootShell.execute(context.cacheDir, SteamRootShell.uninstallCommand(Process.myUid() / 100000))
+        } catch (error: IOException) {
+            throw IllegalStateException(ModuleLocalization.text(context, R.string.management_root_unavailable), error)
+        } catch (error: SecurityException) {
+            throw IllegalStateException(ModuleLocalization.text(context, R.string.management_root_unavailable), error)
+        } catch (error: TimeoutException) {
+            throw IllegalStateException(ModuleLocalization.text(context, R.string.management_result_unknown), error)
+        }
+        check(result.code != 126) {
+            ModuleLocalization.text(context, R.string.management_root_not_root)
+        }
+        check(result.code == 0) {
+            result.output.ifBlank { ModuleLocalization.text(context, R.string.management_uninstall_failed) }
         }
     }
 }

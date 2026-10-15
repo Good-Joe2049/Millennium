@@ -38,33 +38,18 @@ internal class SteamMainMenuSettingFeature(
         }
         val decor = activity.window?.decorView as? ViewGroup ?: return
         val existing = states[activity]
-        if (existing != null) {
-            schedule(existing)
-            return
-        }
+        if (existing != null) return
 
         val state = State(activity, decor)
-        state.layoutListener = ViewTreeObserver.OnGlobalLayoutListener { schedule(state) }
         state.drawListener = ViewTreeObserver.OnPreDrawListener {
-            val layout = state.layout
-            if (layout != null) {
-                if (layout.isAttached) layout.update() else {
-                    layout.remove()
-                    state.layout = null
-                    schedule(state)
-                }
-            }
-            true
+            val previous = state.layout
+            insertIfReady(state)
+            // Adding the overlay requests another layout pass. Do not draw the native
+            // menu alone in this frame; its next draw includes the entry and its space.
+            state.layout == null || state.layout === previous
         }
-        decor.viewTreeObserver.addOnGlobalLayoutListener(state.layoutListener)
         decor.viewTreeObserver.addOnPreDrawListener(state.drawListener)
         states[activity] = state
-        RETRY_DELAYS_MS.forEach { delay ->
-            handler.postDelayed({
-                if (states[activity] === state) insertIfReady(state)
-            }, delay)
-        }
-        insertIfReady(state)
         emit(android.util.Log.INFO, "menu setting entry watcher attached activity=${activity.javaClass.name}")
     }
 
@@ -74,22 +59,11 @@ internal class SteamMainMenuSettingFeature(
             return
         }
         val state = states.remove(activity) ?: return
-        state.decor.viewTreeObserver.takeIf { it.isAlive }?.let {
-            it.removeOnGlobalLayoutListener(state.layoutListener)
-            it.removeOnPreDrawListener(state.drawListener)
-        }
+        state.decor.viewTreeObserver.takeIf { it.isAlive }
+            ?.removeOnPreDrawListener(state.drawListener)
         state.layout?.remove()
         state.layout = null
         emit(android.util.Log.DEBUG, "menu setting entry removed activity=${activity.javaClass.name}")
-    }
-
-    private fun schedule(state: State) {
-        if (state.pending || states[state.activity] !== state) return
-        state.pending = true
-        handler.postDelayed({
-            state.pending = false
-            if (states[state.activity] === state) insertIfReady(state)
-        }, LAYOUT_DEBOUNCE_MS)
     }
 
     private fun insertIfReady(state: State) {
@@ -396,9 +370,7 @@ internal class SteamMainMenuSettingFeature(
     }
 
     private class State(val activity: Activity, val decor: ViewGroup) {
-        lateinit var layoutListener: ViewTreeObserver.OnGlobalLayoutListener
         lateinit var drawListener: ViewTreeObserver.OnPreDrawListener
-        var pending = false
         var waiting = false
         var layout: SteamMainMenuSettingLayout? = null
     }
@@ -413,9 +385,7 @@ internal class SteamMainMenuSettingFeature(
         const val FALLBACK_LABEL_RIGHT_DP = 24
         const val DEFAULT_ROW_HEIGHT_DP = 64
         const val DIVIDER_HEIGHT_DP = 1
-        const val LAYOUT_DEBOUNCE_MS = 80L
         const val MAX_MENU_LABEL_PARENT_LEVELS = 6
-        val RETRY_DELAYS_MS = longArrayOf(0L, 100L, 300L, 800L, 1600L)
         const val DIVIDER_COLOR = 0x33394046
 
         fun dp(context: Context, value: Int): Int =

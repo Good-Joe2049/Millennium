@@ -8,8 +8,13 @@
     <string name="module_steamdb_summary">"Show the Millennium floating button and data panel on game store pages"</string>
     <string name="module_appearance">"Appearance"</string>
     <string name="module_glass">"Liquid Glass navigation bar"</string>
+    <string name="module_glass_settings_summary">"Configure Liquid Glass for the module and Steam navigation bars"</string>
+    <string name="module_settings_glass">"Module Liquid Glass navigation bar"</string>
     <string name="module_glass_summary">"Applies only to the navigation bar in module settings"</string>
     <string name="module_glass_unsupported">"Requires Android 13 or later"</string>
+    <string name="module_steam_glass">"Steam Liquid Glass navigation bar"</string>
+    <string name="module_steam_glass_summary">"Use Liquid Glass for Steam’s bottom navigation bar"</string>
+    <string name="module_steam_glass_tab">"Steam navigation item %1$d"</string>
     <string name="module_coming_soon">"Coming soon"</string>
     <string name="module_themes_summary">"Steam themes will be available here."</string>
     <string name="module_logs_summary">"Log viewing will be available here."</string>
@@ -121,14 +126,19 @@
     <string name="management_cancel">"Cancel"</string>
     <string name="management_confirm">"Uninstall"</string>
     <string name="management_uninstalling">"Uninstalling…"</string>
-    <string name="management_enable_mode">"Select Shizuku(Sui) in Settings → Working mode and grant access first. Make sure the service is running."</string>
-    <string name="management_service_unavailable">"Could not connect. Start Shizuku or enable Sui, then select Shizuku(Sui) again."</string>
+    <string name="management_enable_mode">"Select Shizuku (Sui) or Root in Settings → Working mode and grant access to Steam first."</string>
+    <string name="management_service_unavailable">"Could not connect. Start Shizuku or enable Sui, then select Shizuku (Sui) again."</string>
     <string name="management_permission_waiting">"Waiting for permission. The mode changes only after access is granted."</string>
     <string name="management_permission_denied">"Access was not granted. Allow Steam in Shizuku or Sui, or select the mode again to retry."</string>
     <string name="management_uninstall_failed">"The system could not uninstall Steam."</string>
     <string name="management_result_unknown">"No completion result was received. Check whether Steam is still installed before trying again."</string>
     <string name="management_uninstall_error">"Could not complete uninstall: %1$s"</string>
-    <string name="module_working_mode_shizuku" translatable="false">"Shizuku(Sui)"</string>
+    <string name="module_working_mode_shizuku" translatable="false">"Shizuku (Sui)"</string>
+    <string name="module_working_mode_root" translatable="false">"Root"</string>
+    <string name="management_root_unavailable">"Root is unavailable. Check that Magisk or KernelSU is active and Root access is enabled for Steam, then select Root again."</string>
+    <string name="management_root_denied">"Root access was not granted. Allow Steam in Magisk or KernelSU, then select Root again."</string>
+    <string name="management_root_not_root">"The command did not run as root (UID 0). Check Steam’s Root profile in your Root manager."</string>
+    <string name="management_root_timeout">"Root authorization timed out. Check the permission prompt or allow Steam in your Root manager, then select Root again."</string>
 
     <!-- maFile -->
     <string name="mafile_title">"maFile import and export"</string>
@@ -170,4 +180,6 @@
     <string name="mafile_guard_login_ready">"Ready to restore authenticator secrets and sign-in for Steam codes and login approvals. Fully restart Steam to apply. Online features depend on server acceptance."</string>
     <string name="mafile_guard_only_ready">"Authenticator secrets can be restored. Missing, expired or mismatched login credentials will be skipped, keeping the current session. Login approvals also need a valid session for this account."</string>
     <string name="mafile_restore_saved">"The file was saved, but no restore was scheduled. Check the credential requirements and host support shown above."</string>
+    <string name="module_guest_browsing">Browse Without Signing In</string>
+    <string name="module_guest_browsing_summary">Browse the Steam Store and other public content without signing in. Account features still require sign-in.</string>
 </resources>

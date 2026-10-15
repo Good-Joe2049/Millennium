@@ -162,15 +162,18 @@ internal object SteamModuleSettingLiquidGlassFeature {
 }
 
 @Composable
-private fun LiquidBottomTabs(
+internal fun LiquidBottomTabs(
     selectedTabIndex: () -> Int,
     onTabSelected: (index: Int) -> Unit,
     backdrop: Backdrop,
     tabsCount: Int,
     modifier: Modifier = Modifier,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    onSelectedTabClick: ((Int) -> Unit)? = null,
+    selectionRevision: Int = 0,
     content: @Composable RowScope.() -> Unit
 ) {
-    val isLightTheme = !isSystemInDarkTheme()
+    val isLightTheme = !darkTheme
     val accentColor =
         if (isLightTheme) Color(0xFF0088FF)
         else Color(0xFF0091FF)
@@ -179,6 +182,7 @@ private fun LiquidBottomTabs(
         else Color(0xFF121212).copy(0.4f)
 
     val tabsBackdrop = rememberLayerBackdrop()
+    val selectedTabClick = rememberUpdatedState(onSelectedTabClick)
 
     BoxWithConstraints(
         modifier,
@@ -188,9 +192,10 @@ private fun LiquidBottomTabs(
         val tabWidth = with(density) {
             (constraints.maxWidth.toFloat() - 8f.dp.toPx()) / tabsCount
         }
+        val currentTabWidth = rememberUpdatedState(tabWidth)
 
         val offsetAnimation = remember { Animatable(0f) }
-        val panelOffset by remember(density) {
+        val panelOffset by remember(density, constraints.maxWidth) {
             derivedStateOf {
                 val fraction = (offsetAnimation.value / constraints.maxWidth).fastCoerceIn(-1f, 1f)
                 with(density) {
@@ -200,6 +205,7 @@ private fun LiquidBottomTabs(
         }
 
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+        val currentDirection = rememberUpdatedState(isLtr)
         val animationScope = rememberCoroutineScope()
         var currentIndex by remember(selectedTabIndex) {
             mutableIntStateOf(selectedTabIndex())
@@ -212,6 +218,7 @@ private fun LiquidBottomTabs(
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
                 pressedScale = 78f / 56f,
+                onTap = { selectedTabClick.value?.invoke(selectedTabIndex()) },
                 onDragStarted = {},
                 onDragStopped = {
                     val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
@@ -226,16 +233,20 @@ private fun LiquidBottomTabs(
                 },
                 onDrag = { _, dragAmount ->
                     updateValue(
-                        (targetValue + dragAmount.x / tabWidth * if (isLtr) 1f else -1f)
+                        (targetValue + dragAmount.x / currentTabWidth.value * if (currentDirection.value) 1f else -1f)
                             .fastCoerceIn(0f, (tabsCount - 1).toFloat())
                     )
                     animationScope.launch {
                         offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
                     }
-                }
+                },
+                onDragCancelled = {
+                    animateToValue(selectedTabIndex().toFloat())
+                    animationScope.launch { offsetAnimation.animateTo(0f) }
+                },
             )
         }
-        LaunchedEffect(selectedTabIndex) {
+        LaunchedEffect(selectedTabIndex, selectionRevision) {
             snapshotFlow { selectedTabIndex() }
                 .collectLatest { index ->
                     currentIndex = index
@@ -255,8 +266,8 @@ private fun LiquidBottomTabs(
                 animationScope = animationScope,
                 position = { size, _ ->
                     Offset(
-                        if (isLtr) (dampedDragAnimation.value + 0.5f) * tabWidth + panelOffset
-                        else size.width - (dampedDragAnimation.value + 0.5f) * tabWidth + panelOffset,
+                        if (currentDirection.value) (dampedDragAnimation.value + 0.5f) * currentTabWidth.value + panelOffset
+                        else size.width - (dampedDragAnimation.value + 0.5f) * currentTabWidth.value + panelOffset,
                         size.height / 2f
                     )
                 }
@@ -396,7 +407,7 @@ private val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
 
 @Composable
-private fun RowScope.LiquidBottomTab(
+internal fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
@@ -434,6 +445,8 @@ private class DampedDragAnimation(
     val onDragStarted: DampedDragAnimation.(position: Offset) -> Unit,
     val onDragStopped: DampedDragAnimation.() -> Unit,
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
+    val onTap: (() -> Unit)? = null,
+    val onDragCancelled: DampedDragAnimation.() -> Unit = onDragStopped,
 ) {
 
     private val valueAnimationSpec =
@@ -470,20 +483,26 @@ private class DampedDragAnimation(
     val velocity: Float get() = velocityAnimation.value
 
     val modifier: Modifier = Modifier.pointerInput(Unit) {
+        var start = Offset.Zero
+        var distance = 0f
         inspectDragGestures(
             onDragStart = { down ->
+                start = down.position
+                distance = 0f
                 onDragStarted(down.position)
                 press()
             },
-            onDragEnd = {
+            onDragEnd = { up ->
+                if (maxOf(distance, (up.position - start).getDistance()) <= viewConfiguration.touchSlop) onTap?.invoke()
                 onDragStopped()
                 release()
             },
             onDragCancel = {
-                onDragStopped()
+                onDragCancelled()
                 release()
             }
-        ) { _, dragAmount ->
+        ) { change, dragAmount ->
+            distance = maxOf(distance, (change.position - start).getDistance())
             onDrag(size, dragAmount)
         }
     }

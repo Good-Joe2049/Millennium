@@ -9,6 +9,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -19,10 +20,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -48,6 +54,9 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -199,6 +208,10 @@ private fun GeneralPage(
     glassSupported: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
 ) {
+    val context = LocalView.current.context
+    var steamGlassEnabled by remember { mutableStateOf(SteamModuleSettings.isSteamBottomGlassEnabled(context)) }
+    var showGlassDialog by rememberSaveable { mutableStateOf(false) }
+    var glassHoldDown by rememberSaveable { mutableStateOf(false) }
     SmallTitle(text = stringResource(R.string.module_general))
     Card(
         modifier = Modifier
@@ -213,6 +226,10 @@ private fun GeneralPage(
         )
         SteamGuardExportEntry()
         SteamMaFileEntry()
+        BasicComponent(
+            title = stringResource(R.string.module_guest_browsing),
+            summary = stringResource(R.string.module_guest_browsing_summary),
+        )
     }
     SmallTitle(text = stringResource(R.string.module_appearance))
     Card(
@@ -220,14 +237,58 @@ private fun GeneralPage(
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
-        SwitchPreference(
+        ArrowPreference(
             title = stringResource(R.string.module_glass),
-            summary = if (glassSupported) stringResource(R.string.module_glass_summary)
+            summary = if (glassSupported) stringResource(R.string.module_glass_settings_summary)
             else stringResource(R.string.module_glass_unsupported),
-            checked = liquidGlassEnabled,
-            enabled = glassSupported,
-            onCheckedChange = onLiquidGlassEnabledChange,
+            holdDownState = glassHoldDown,
+            onClick = {
+                showGlassDialog = true
+                glassHoldDown = true
+            },
         )
+    }
+    OverlayDialog(
+        show = showGlassDialog,
+        title = stringResource(R.string.module_glass),
+        largeScreen = true,
+        onDismissRequest = { showGlassDialog = false },
+        onDismissFinished = { glassHoldDown = false },
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                SwitchPreference(
+                    title = stringResource(R.string.module_settings_glass),
+                    summary = stringResource(if (glassSupported) R.string.module_glass_summary else R.string.module_glass_unsupported),
+                    checked = liquidGlassEnabled,
+                    enabled = glassSupported,
+                    insideMargin = PaddingValues(vertical = 12.dp),
+                    onCheckedChange = onLiquidGlassEnabledChange,
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.module_steam_glass),
+                    summary = stringResource(if (glassSupported) R.string.module_steam_glass_summary else R.string.module_glass_unsupported),
+                    checked = steamGlassEnabled && glassSupported,
+                    enabled = glassSupported,
+                    insideMargin = PaddingValues(vertical = 12.dp),
+                    onCheckedChange = {
+                        SteamModuleSettings.setSteamBottomGlassEnabled(context, it)
+                        steamGlassEnabled = it
+                    },
+                )
+            }
+            TextButton(
+                text = stringResource(R.string.module_close),
+                onClick = { showGlassDialog = false },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
     SteamManagementCard()
 }
