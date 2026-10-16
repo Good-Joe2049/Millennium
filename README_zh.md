@@ -121,6 +121,10 @@
 - 兼容 **Monica Steam** 和 **Steam Desktop Authenticator（SDA）** 使用的单账号明文 maFile 格式。支持导入不超过 **1 MB** 的文件，暂不支持 ZIP 压缩包和加密备份。
 - **已实测与 Monica Steam 互通：** 导出的 maFile 可用于多设备生成 Steam 动态验证码和登录批准。在 Monica 的 maFile 导入界面选择已保存的文件即可。
 
+**从 Monica Steam 获取：** 导入页新增快捷入口，向同一 Android 用户或资料中兼容的 Monica Steam 请求一个账号。Monica 要求先配置主密码，每次重新解锁、选择账号并明确确认。模块通过绑定 UID 的短时授权读取一次 maFile，不保存明文临时文件，然后显示原有预览；仍需点击**导入**才会应用，不会在收到数据时自动导入或恢复。Steam 及其注入代码仍能永久保留已读到的凭据。
+
+需要 Monica Steam 支持 [maFile 交付协议 v1](docs/monica-mafile-handoff.md)，目前配套实现正在加入其 1.0.310 开发版本。未安装或旧版可继续使用**选择 maFile 文件**。新快捷入口仍需 Steam／LSPosed 真机互通验证，上述文件互通的实测结果不代表此入口已通过验证。
+
 ### 在官方 Steam 中恢复
 
 1. 在来源手机打开 Steam 的**令牌**页面，再通过 Millennium 导出该账号的 maFile。
@@ -228,7 +232,7 @@ Steam 和 SteamDB 是不同的数据来源，可用性与更新时间可能不�
 <details>
 <summary><strong>能否直接打开 Monica 并自动导入账号？</strong></summary>
 
-目前需要先导出 maFile，再到 Monica Steam 的导入界面选择文件，尚未实现自动跳转导入。Stratum 和 Aegis 已支持从 Steam 令牌导出弹窗直接打开并带入数据。
+**Monica Steam → Millennium** 可在兼容版本中使用“从 Monica Steam 获取”，并在 Monica 中授权。**Millennium → Monica Steam** 仍需先导出 maFile，再到 Monica Steam 的导入界面选择文件，尚未实现该方向的自动跳转导入。Stratum 和 Aegis 已支持从 Steam 令牌导出弹窗直接打开并带入数据。
 
 </details>
 
