@@ -80,6 +80,9 @@ internal class SteamModuleSettingFeature(
                     var liquidGlassEnabled by remember {
                         mutableStateOf(SteamModuleSettings.isLiquidGlassEnabled(activity))
                     }
+                    var steamGuardDefaultPage by remember {
+                        mutableStateOf(SteamModuleSettings.steamGuardDefaultPage(activity))
+                    }
                     val dark = isSystemInDarkTheme()
                     SideEffect { styleSystemBars(window, dark) }
                     ModuleLocalization.Provide {
@@ -90,6 +93,12 @@ internal class SteamModuleSettingFeature(
                             closing = session.closing,
                             steamDbEnabled = enabled,
                             liquidGlassEnabled = liquidGlassEnabled,
+                            steamGuardDefaultPage = steamGuardDefaultPage,
+                            onSteamGuardDefaultPageChange = { value ->
+                                SteamModuleSettings.setSteamGuardDefaultPage(activity, value)
+                                steamGuardDefaultPage = value
+                                emit(Log.INFO, "module setting changed steamGuardDefaultPage=${value.routeName}")
+                            },
                             onLiquidGlassEnabledChange = { value ->
                                 SteamModuleSettings.setLiquidGlassEnabled(activity, value)
                                 liquidGlassEnabled = value

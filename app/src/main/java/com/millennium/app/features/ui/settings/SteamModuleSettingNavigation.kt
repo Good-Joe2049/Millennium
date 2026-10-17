@@ -38,6 +38,8 @@ internal fun SteamModuleSettingNavigation(
     onSteamDbEnabledChange: (Boolean) -> Unit,
     liquidGlassEnabled: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
+    steamGuardDefaultPage: SteamGuardDefaultPage,
+    onSteamGuardDefaultPageChange: (SteamGuardDefaultPage) -> Unit,
     onLanguageChange: (ModuleLanguage) -> Unit,
     onRequestClose: () -> Unit,
     onClosed: () -> Unit,
@@ -102,6 +104,8 @@ internal fun SteamModuleSettingNavigation(
                 onSteamDbEnabledChange = onSteamDbEnabledChange,
                 liquidGlassEnabled = liquidGlassEnabled,
                 onLiquidGlassEnabledChange = onLiquidGlassEnabledChange,
+                steamGuardDefaultPage = steamGuardDefaultPage,
+                onSteamGuardDefaultPageChange = onSteamGuardDefaultPageChange,
             )
         }
     }

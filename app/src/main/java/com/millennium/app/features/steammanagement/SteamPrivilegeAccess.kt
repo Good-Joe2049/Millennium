@@ -35,6 +35,7 @@ internal object SteamPrivilegeAccess {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var application: Application? = null
     private var rootJob: Job? = null
+    private var dhizukuJob: Job? = null
     private var requestSequence = 4100
     private var pendingCode: Int? = null
     private var connectionGeneration = 0
@@ -102,6 +103,12 @@ internal object SteamPrivilegeAccess {
         when (value) {
             SteamWorkingMode.Disabled -> saveMode(value)
             SteamWorkingMode.Root -> requestRoot()
+            SteamWorkingMode.Dhizuku -> {
+                val code = ++requestSequence
+                pendingCode = code
+                requestingMode = value
+                checkDhizukuRequest(code, requestPermission = true)
+            }
             SteamWorkingMode.Shizuku -> {
                 pendingCode = ++requestSequence
                 requestingMode = value
@@ -114,6 +121,8 @@ internal object SteamPrivilegeAccess {
     fun cancelRequest() {
         rootJob?.cancel()
         rootJob = null
+        dhizukuJob?.cancel()
+        dhizukuJob = null
         pendingCode = null
         focusLostRequest = null
         permissionSentCode = null
@@ -123,16 +132,20 @@ internal object SteamPrivilegeAccess {
     }
 
     fun onWindowFocusChanged(hasFocus: Boolean) {
-        if (requestingMode != SteamWorkingMode.Shizuku) return
+        val target = requestingMode ?: return
+        if (target != SteamWorkingMode.Shizuku && target != SteamWorkingMode.Dhizuku) return
         val code = pendingCode ?: return
+        // A dropdown closing is not a return from the external permission UI.
+        if (target == SteamWorkingMode.Dhizuku && permissionSentCode != code) return
         if (!hasFocus) {
             focusLostRequest = code
         } else if (focusLostRequest == code) {
             // Some permission UIs dismiss without sending a result. Reconcile on return,
             // allowing the ordinary permission callback to arrive first.
             main.postDelayed({
-                if (requestingMode == SteamWorkingMode.Shizuku && pendingCode == code && focusLostRequest == code) {
-                    finishRequest(SteamWorkingMode.Shizuku, hasPermission(), R.string.management_permission_denied)
+                if (requestingMode == target && pendingCode == code && focusLostRequest == code) {
+                    if (target == SteamWorkingMode.Dhizuku) checkDhizukuRequest(code)
+                    else finishRequest(target, hasPermission(), R.string.management_permission_denied)
                 }
             }, 300)
         }
@@ -143,6 +156,7 @@ internal object SteamPrivilegeAccess {
         when (mode) {
             SteamWorkingMode.Disabled -> ready = false
             SteamWorkingMode.Root -> requestRoot()
+            SteamWorkingMode.Dhizuku -> refreshDhizuku()
             SteamWorkingMode.Shizuku -> {
                 if (binderReady()) {
                     ready = hasPermission()
@@ -164,6 +178,50 @@ internal object SteamPrivilegeAccess {
         mode = value
         if (value == SteamWorkingMode.Disabled) ready = false
         application?.let { SteamModuleSettings.setWorkingMode(it, value) }
+    }
+
+    private fun refreshDhizuku() {
+        val host = application ?: return
+        if (dhizukuJob?.isActive == true) return
+        val generation = connectionGeneration
+        dhizukuJob = scope.launch {
+            val result = SteamDhizukuAccess.checkAccess(host)
+            if (generation != connectionGeneration || mode != SteamWorkingMode.Dhizuku || requesting) return@launch
+            dhizukuJob = null
+            ready = result == SteamDhizukuAccess.Access.Granted
+            if (result == SteamDhizukuAccess.Access.Denied) saveMode(SteamWorkingMode.Disabled)
+            message = result.message
+        }
+    }
+
+    private fun checkDhizukuRequest(code: Int, requestPermission: Boolean = false) {
+        val host = application ?: return
+        if (pendingCode != code || requestingMode != SteamWorkingMode.Dhizuku) return
+        dhizukuJob?.cancel()
+        dhizukuJob = scope.launch {
+            val result = SteamDhizukuAccess.checkAccess(host)
+            if (pendingCode != code || requestingMode != SteamWorkingMode.Dhizuku) return@launch
+            dhizukuJob = null
+            if (result == SteamDhizukuAccess.Access.Denied && requestPermission) {
+                try {
+                    permissionSentCode = code
+                    focusLostRequest = null
+                    SteamDhizukuAccess.requestPermission { granted ->
+                        main.post {
+                            if (pendingCode == code && requestingMode == SteamWorkingMode.Dhizuku) {
+                                if (granted) checkDhizukuRequest(code)
+                                else finishRequest(SteamWorkingMode.Dhizuku, false, R.string.management_dhizuku_denied)
+                            }
+                        }
+                    }
+                } catch (error: Exception) {
+                    Log.w("MillenniumSteamManagement", "Dhizuku permission request failed", error)
+                    finishRequest(SteamWorkingMode.Dhizuku, false, R.string.management_dhizuku_unavailable)
+                }
+            } else {
+                finishRequest(SteamWorkingMode.Dhizuku, result == SteamDhizukuAccess.Access.Granted, result.message)
+            }
+        }
     }
 
     private fun requestRoot() {

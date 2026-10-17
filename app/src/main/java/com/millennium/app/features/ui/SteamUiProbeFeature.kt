@@ -40,10 +40,11 @@ internal class SteamUiProbeFeature(
             floatingPanelFeature.detach(activity)
             floatingPanelFeature.attach(activity)
         },
-    ) { activity, enabled ->
-        if (enabled) floatingPanelFeature.attach(activity)
-        else floatingPanelFeature.hideAll()
-    }
+        onSteamDbChanged = { activity, enabled ->
+            if (enabled) floatingPanelFeature.attach(activity)
+            else floatingPanelFeature.hideAll()
+        },
+    )
     private val menuSettingFeature = SteamMainMenuSettingFeature(
         emit = emit,
         iconProvider = { activity -> floatingPanelFeature.moduleIcon(activity) },

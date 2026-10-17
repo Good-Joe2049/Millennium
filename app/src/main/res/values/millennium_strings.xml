@@ -5,8 +5,10 @@
     <string name="module_logs">"Logs"</string>
     <string name="module_settings">"Settings"</string>
     <string name="module_steamdb">"SteamDB floating panel"</string>
-    <string name="module_steamdb_summary">"Show the Millennium floating button and data panel on game store pages"</string>
+    <string name="module_steamdb_summary">"Only shown on Steam game store pages"</string>
     <string name="module_appearance">"Appearance"</string>
+    <string name="module_library_pinch_zoom">"Library pinch zoom"</string>
+    <string name="module_library_pinch_zoom_summary">"Pinch-to-zoom effects like those on Telegram’s media page"</string>
     <string name="module_glass">"Liquid Glass navigation bar"</string>
     <string name="module_glass_settings_summary">"Configure Liquid Glass for the module and Steam navigation bars"</string>
     <string name="module_settings_glass">"Module Liquid Glass navigation bar"</string>
@@ -126,7 +128,7 @@
     <string name="management_cancel">"Cancel"</string>
     <string name="management_confirm">"Uninstall"</string>
     <string name="management_uninstalling">"Uninstalling…"</string>
-    <string name="management_enable_mode">"Select Shizuku (Sui) or Root in Settings → Working mode and grant access to Steam first."</string>
+    <string name="management_enable_mode">"Select Shizuku (Sui), Dhizuku or Root in Settings → Working mode and grant access to Steam first."</string>
     <string name="management_service_unavailable">"Could not connect. Start Shizuku or enable Sui, then select Shizuku (Sui) again."</string>
     <string name="management_permission_waiting">"Waiting for permission. The mode changes only after access is granted."</string>
     <string name="management_permission_denied">"Access was not granted. Allow Steam in Shizuku or Sui, or select the mode again to retry."</string>
@@ -134,7 +136,12 @@
     <string name="management_result_unknown">"No completion result was received. Check whether Steam is still installed before trying again."</string>
     <string name="management_uninstall_error">"Could not complete uninstall: %1$s"</string>
     <string name="module_working_mode_shizuku" translatable="false">"Shizuku (Sui)"</string>
+    <string name="module_working_mode_dhizuku" translatable="false">"Dhizuku"</string>
     <string name="module_working_mode_root" translatable="false">"Root"</string>
+    <string name="management_dhizuku_unavailable">"Could not connect to Dhizuku. Activate Dhizuku and enable its service, then select Dhizuku again."</string>
+    <string name="management_dhizuku_version">"This Dhizuku version is not supported. Update Dhizuku, then try again."</string>
+    <string name="management_dhizuku_denied">"Dhizuku access was not granted. Allow Steam in Dhizuku, or select the mode again to retry."</string>
+    <string name="management_dhizuku_uninstall_unsupported">"This device does not support uninstalling Steam with data kept through Dhizuku."</string>
     <string name="management_root_unavailable">"Root is unavailable. Check that Magisk or KernelSU is active and Root access is enabled for Steam, then select Root again."</string>
     <string name="management_root_denied">"Root access was not granted. Allow Steam in Magisk or KernelSU, then select Root again."</string>
     <string name="management_root_not_root">"The command did not run as root (UID 0). Check Steam’s Root profile in your Root manager."</string>
@@ -181,5 +188,12 @@
     <string name="mafile_guard_only_ready">"Authenticator secrets can be restored. Missing, expired or mismatched login credentials will be skipped, keeping the current session. Login approvals also need a valid session for this account."</string>
     <string name="mafile_restore_saved">"The file was saved, but no restore was scheduled. Check the credential requirements and host support shown above."</string>
     <string name="module_guest_browsing">Browse Without Signing In</string>
-    <string name="module_guest_browsing_summary">Browse the Steam Store and other public content without signing in. Account features still require sign-in.</string>
+    <string name="module_guest_browsing_summary">Browse the Steam Store while signed out.</string>
+    <string name="module_steam_guard_default_page">Steam Guard default page</string>
+    <string name="module_steam_guard_default_page_summary">Default page when opening Steam Guard</string>
+    <string name="module_restart_required">Restart Steam to apply</string>
+    <string name="module_steam_guard_next_code">Show next Steam Guard code</string>
+    <string name="module_steam_guard_next_code_summary">Show the next code on the Steam Guard page.</string>
+    <string name="module_steam_guard_code">Guard Code</string>
+    <string name="module_steam_scan_qr">Scan QR code</string>
 </resources>

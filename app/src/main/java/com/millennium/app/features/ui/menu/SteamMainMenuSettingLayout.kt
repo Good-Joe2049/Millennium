@@ -9,11 +9,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ScrollView
+import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import java.util.IdentityHashMap
 import kotlin.math.ceil
 
-/** Owns native entry layout without adding foreign children to React Native's managed list. */
+/** Keeps the native entry inside Steam's ScrollView content so overscroll transforms apply. */
 internal class SteamMainMenuSettingLayout(
     private val decor: ViewGroup,
     private val anchor: View,
@@ -22,63 +23,50 @@ internal class SteamMainMenuSettingLayout(
     private val entry: View,
     private val emit: (Int, String) -> Unit,
 ) {
+    /** The host is a child of the scrolling content instead of the window decor overlay. */
     private val overlay = EntryOverlay(decor.context)
     private val shiftedViews = IdentityHashMap<View, Float>()
-    private val anchorLocation = IntArray(2)
-    private val overlayLocation = IntArray(2)
-    private val scrollLocation = IntArray(2)
-    private val viewport = Rect()
-    private val clippedEntry = Rect()
+    private val visibleRect = Rect()
     private var shift = 0
     private var originalHeight = content.height
     private var appliedHeight = 0
 
     val isAttached: Boolean
-        get() = overlay.parent === decor && entry.parent === overlay &&
+        get() = overlay.parent === content && entry.parent === overlay &&
                 anchor.parent === content && content.parent === scroll &&
                 anchor.isAttachedToWindow && anchor.rootView === decor
 
     fun attach() {
         entry.visibility = View.INVISIBLE
         overlay.addView(entry, FrameLayout.LayoutParams(0, 0, Gravity.TOP or Gravity.START))
-        // Keep the existing floating panel and its scrim above this menu entry.
-        val floatingIndex = (0 until decor.childCount).firstOrNull {
-            decor.getChildAt(it).tag == "millennium.floating.panel.root"
-        } ?: decor.childCount
-        decor.addView(overlay, floatingIndex, ViewGroup.LayoutParams(-1, -1))
+        // Put the host above the native rows while keeping it inside the transformed content.
+        content.addView(overlay, ViewGroup.LayoutParams(-1, 0))
         update()
     }
 
-    /** Called before drawing so scrolling and RN screen transitions cannot leave a stale overlay. */
+    /** Called before drawing so scrolling and RN screen transitions cannot leave a stale host. */
     fun update() {
-        if (!isAttached || !hasVisibleAncestors() || !scroll.getLocalVisibleRect(viewport)) {
+        visibleRect.setEmpty()
+        if (!isAttached || !hasVisibleAncestors() || !scroll.getLocalVisibleRect(visibleRect)) {
             hide("menu-not-visible")
             return
         }
         val width = anchor.width
         val height = anchor.height
-        if (width <= 0 || height <= 0 || overlay.width <= 0 || overlay.height <= 0) {
+        if (width <= 0 || height <= 0 || content.width <= 0 || content.height <= 0) {
             hide("awaiting-layout")
             return
         }
         reserveSpace(height)
-        anchor.getLocationInWindow(anchorLocation)
-        overlay.getLocationInWindow(overlayLocation)
-        scroll.getLocationInWindow(scrollLocation)
-        val left = anchorLocation[0] - overlayLocation[0]
-        val top = anchorLocation[1] - overlayLocation[1] - shift
-        viewport.offset(
-            scrollLocation[0] - overlayLocation[0] - scroll.scrollX,
-            scrollLocation[1] - overlayLocation[1] - scroll.scrollY,
-        )
-        clippedEntry.set(left, top, left + width, top + height)
-        if (!clippedEntry.intersect(viewport)) {
-            hide("scrolled-out")
-            return
-        }
-        overlay.touchBounds.set(clippedEntry)
-        clippedEntry.offset(-left, -top)
-        if (entry.clipBounds != clippedEntry) entry.clipBounds = clippedEntry
+
+        // reserveSpace stores the anchor's pre-insertion translation. The entry occupies
+        // that original slot while the native Store row and following rows stay shifted down.
+        val baseTranslationY = shiftedViews[anchor] ?: (anchor.translationY - shift)
+        val left = anchor.left.toFloat() + anchor.translationX
+        val top = anchor.top.toFloat() + baseTranslationY
+        layoutOverlay(width, height, left, top)
+        overlay.touchBounds.set(0, 0, width, height)
+
         val resized = entry.width != width || entry.height != height
         val params = entry.layoutParams
         if (params.width != width || params.height != height) {
@@ -93,15 +81,40 @@ internal class SteamMainMenuSettingLayout(
             )
             entry.layout(0, 0, width, height)
         }
-        entry.x = left.toFloat()
-        entry.y = top.toFloat()
+        entry.x = 0f
+        entry.y = 0f
+        entry.clipBounds = null
         val shown = entry.visibility != View.VISIBLE
+        overlay.visibility = View.VISIBLE
         if (shown) entry.visibility = View.VISIBLE
         if (resized || shown) emit(
             Log.INFO,
             "menu setting entry laid out actual=${entry.width}x${entry.height} " +
-                    "left=$left top=$top overlay=${overlay.width}x${overlay.height} visible=true",
+                    "left=${left.toInt()} top=${top.toInt()} content=${content.width}x${content.height} visible=true",
         )
+    }
+
+    private fun layoutOverlay(width: Int, height: Int, left: Float, top: Float) {
+        // Keep the host out of React Native's measured content height. Its actual drawing
+        // bounds are set below and refreshed on every pre-draw after content relayouts.
+        val params = overlay.layoutParams
+        if (params.width != -1 || params.height != 0) {
+            params.width = -1
+            params.height = 0
+            overlay.layoutParams = params
+        }
+        // RN chooses JS touch targets from view bounds before Android dispatchTouchEvent.
+        // A content-sized native host wins that search even when it later returns false.
+        // Restrict the host itself to the entry row so native menu rows remain reachable.
+        if (overlay.width != width || overlay.height != height || overlay.isLayoutRequested) {
+            overlay.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+            )
+            overlay.layout(0, 0, width, height)
+        }
+        if (overlay.x != left) overlay.x = left
+        if (overlay.y != top) overlay.y = top
     }
 
     private fun hasVisibleAncestors(): Boolean {
@@ -120,13 +133,16 @@ internal class SteamMainMenuSettingLayout(
         val iterator = shiftedViews.entries.iterator()
         while (iterator.hasNext()) {
             val (child, original) = iterator.next()
-            if (child.parent !== content || content.indexOfChild(child) < index) {
-                if (child.translationY == original + shift) child.translationY = original
+            if (child === overlay || child.parent !== content || content.indexOfChild(child) < index) {
+                if (child.parent === content && child !== overlay && child.translationY == original + shift) {
+                    child.translationY = original
+                }
                 iterator.remove()
             }
         }
         for (position in index until content.childCount) {
             val child = content.getChildAt(position)
+            if (child === overlay) continue
             val original = shiftedViews.getOrPut(child) { child.translationY }
             if (child.translationY != original + height) child.translationY = original + height
         }
@@ -136,12 +152,11 @@ internal class SteamMainMenuSettingLayout(
         var requiredHeight = originalHeight + height
         for (position in 0 until content.childCount) {
             val child = content.getChildAt(position)
-            if (child.visibility != View.GONE) {
-                requiredHeight = maxOf(
-                    requiredHeight,
-                    ceil(child.bottom + child.translationY).toInt() + content.paddingBottom,
-                )
-            }
+            if (child === overlay || child.isGone) continue
+            requiredHeight = maxOf(
+                requiredHeight,
+                ceil(child.bottom + child.translationY).toInt() + content.paddingBottom,
+            )
         }
         val changed = shift != height || oldCount != shiftedViews.size || content.height != requiredHeight
         shift = height
@@ -164,6 +179,10 @@ internal class SteamMainMenuSettingLayout(
 
     private fun hide(reason: String) {
         overlay.touchBounds.setEmpty()
+        overlay.visibility = View.INVISIBLE
+        // RN hit testing does not use this native view's visibility or dispatch result.
+        // Collapse its bounds too, including while the menu is awaiting a new layout.
+        if (overlay.width != 0 || overlay.height != 0) overlay.layout(0, 0, 0, 0)
         if (entry.isVisible) {
             entry.visibility = View.INVISIBLE
             emit(Log.DEBUG, "menu setting entry hidden reason=$reason")
@@ -174,7 +193,9 @@ internal class SteamMainMenuSettingLayout(
         hide("detached")
         (overlay.parent as? ViewGroup)?.removeView(overlay)
         shiftedViews.forEach { (child, original) ->
-            if (child.translationY == original + shift) child.translationY = original
+            if (child.parent === content && child.translationY == original + shift) {
+                child.translationY = original
+            }
         }
         shiftedViews.clear()
         if (appliedHeight > 0 && content.height == appliedHeight) resizeContent(originalHeight)
@@ -188,6 +209,7 @@ internal class SteamMainMenuSettingLayout(
         init {
             tag = ROOT_TAG
             isClickable = false
+            clipChildren = true
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 

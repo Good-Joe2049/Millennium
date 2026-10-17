@@ -5,8 +5,10 @@
     <string name="module_logs">"日志"</string>
     <string name="module_settings">"设置"</string>
     <string name="module_steamdb">"SteamDB 悬浮面板"</string>
-    <string name="module_steamdb_summary">"在游戏商店页面显示 Millennium 悬浮球和数据面板"</string>
+    <string name="module_steamdb_summary">"仅在游戏商店页面显示"</string>
     <string name="module_appearance">"界面美化"</string>
+    <string name="module_library_pinch_zoom">"游戏库双指缩放"</string>
+    <string name="module_library_pinch_zoom_summary">"类似 Telegram 媒体页面的缩放效果"</string>
     <string name="module_glass">"液态玻璃底栏"</string>
     <string name="module_glass_settings_summary">"分别设置模块和 Steam 的底栏液态玻璃效果"</string>
     <string name="module_settings_glass">"模块底栏液态玻璃"</string>
@@ -119,10 +121,14 @@
     <string name="management_cancel">"取消"</string>
     <string name="management_confirm">"卸载"</string>
     <string name="management_uninstalling">"正在卸载…"</string>
-    <string name="management_enable_mode">"请先在「设置 → 工作模式」选择 Shizuku (Sui) 或 Root，并为 Steam 授权。"</string>
+    <string name="management_enable_mode">"请先在「设置 → 工作模式」选择 Shizuku (Sui)、Dhizuku 或 Root，并为 Steam 授权。"</string>
     <string name="management_service_unavailable">"连接不可用。请启动 Shizuku 或启用 Sui，然后重新选择 Shizuku (Sui)。"</string>
     <string name="management_permission_waiting">"正在等待授权，允许后才会切换工作模式。"</string>
     <string name="management_permission_denied">"未获得授权。请在 Shizuku 或 Sui 中允许 Steam，或重新选择工作模式以重试。"</string>
+    <string name="management_dhizuku_unavailable">"无法连接 Dhizuku。请激活 Dhizuku 并开启服务，然后重新选择 Dhizuku。"</string>
+    <string name="management_dhizuku_version">"当前 Dhizuku 版本不受支持，请更新 Dhizuku 后重试。"</string>
+    <string name="management_dhizuku_denied">"未获得 Dhizuku 授权。请在 Dhizuku 中允许 Steam，或重新选择工作模式以重试。"</string>
+    <string name="management_dhizuku_uninstall_unsupported">"此设备不支持通过 Dhizuku 保留数据卸载 Steam。"</string>
     <string name="management_uninstall_failed">"系统未能卸载 Steam。"</string>
     <string name="management_result_unknown">"未收到完成结果。再次操作前，请先确认 Steam 是否仍已安装。"</string>
     <string name="management_uninstall_error">"未能完成卸载：%1$s"</string>
@@ -172,5 +178,12 @@
     <string name="mafile_guard_only_ready">"可恢复令牌密钥；文件中的登录凭据缺失、过期或不匹配，将保留当前登录会话。登录批准还需要该账号的有效会话。"</string>
     <string name="mafile_restore_saved">"文件已保存，未安排恢复。请查看上方的凭据要求与宿主支持提示。"</string>
     <string name="module_guest_browsing">免登录浏览</string>
-    <string name="module_guest_browsing_summary">未登录时也可进入 Steam，浏览商店等公开内容。使用账户相关功能仍需登录。</string>
+    <string name="module_guest_browsing_summary">未登录时也可进入 Steam 浏览商店</string>
+    <string name="module_steam_guard_default_page">Steam 令牌默认页面</string>
+    <string name="module_steam_guard_default_page_summary">打开令牌页默认显示的页面</string>
+    <string name="module_restart_required">重启生效</string>
+    <string name="module_steam_guard_next_code">显示下一个验证码</string>
+    <string name="module_steam_guard_next_code_summary">在令牌页显示下一组验证码</string>
+    <string name="module_steam_guard_code">令牌验证码</string>
+    <string name="module_steam_scan_qr">扫描二维码</string>
 </resources>

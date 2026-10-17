@@ -44,6 +44,7 @@ import com.millennium.app.features.steammanagement.ui.SteamWorkingModePreference
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
 import android.view.ViewTreeObserver
+import android.widget.Toast
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -84,6 +85,8 @@ internal fun SteamModuleSettingScreen(
     onSteamDbEnabledChange: (Boolean) -> Unit,
     liquidGlassEnabled: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
+    steamGuardDefaultPage: SteamGuardDefaultPage,
+    onSteamGuardDefaultPageChange: (SteamGuardDefaultPage) -> Unit,
 ) {
     val view = LocalView.current
     DisposableEffect(view) {
@@ -183,6 +186,8 @@ internal fun SteamModuleSettingScreen(
                             liquidGlassEnabled = useGlass,
                             glassSupported = glassSupported,
                             onLiquidGlassEnabledChange = onLiquidGlassEnabledChange,
+                            steamGuardDefaultPage = steamGuardDefaultPage,
+                            onSteamGuardDefaultPageChange = onSteamGuardDefaultPageChange,
                         )
                         1 -> PlaceholderPage(
                             title = stringResource(R.string.module_themes),
@@ -207,9 +212,14 @@ private fun GeneralPage(
     liquidGlassEnabled: Boolean,
     glassSupported: Boolean,
     onLiquidGlassEnabledChange: (Boolean) -> Unit,
+    steamGuardDefaultPage: SteamGuardDefaultPage,
+    onSteamGuardDefaultPageChange: (SteamGuardDefaultPage) -> Unit,
 ) {
     val context = LocalView.current.context
+    val restartMessage = stringResource(R.string.module_restart_required)
     var steamGlassEnabled by remember { mutableStateOf(SteamModuleSettings.isSteamBottomGlassEnabled(context)) }
+    var nextCodeEnabled by remember { mutableStateOf(SteamModuleSettings.isSteamGuardNextCodeEnabled(context)) }
+    var libraryPinchZoomEnabled by remember { mutableStateOf(SteamModuleSettings.isSteamLibraryPinchZoomEnabled(context)) }
     var showGlassDialog by rememberSaveable { mutableStateOf(false) }
     var glassHoldDown by rememberSaveable { mutableStateOf(false) }
     SmallTitle(text = stringResource(R.string.module_general))
@@ -225,6 +235,32 @@ private fun GeneralPage(
             onCheckedChange = onSteamDbEnabledChange,
         )
         SteamGuardExportEntry()
+        OverlayDropdownPreference(
+            items = listOf(
+                stringResource(R.string.module_steam_guard_code),
+                stringResource(R.string.module_steam_scan_qr),
+            ),
+            selectedIndex = if (steamGuardDefaultPage == SteamGuardDefaultPage.GuardCode) 0 else 1,
+            title = stringResource(R.string.module_steam_guard_default_page),
+            summary = stringResource(R.string.module_steam_guard_default_page_summary),
+            onSelectedIndexChange = { index ->
+                val page = if (index == 0) SteamGuardDefaultPage.GuardCode else SteamGuardDefaultPage.ScanQrCode
+                if (page != steamGuardDefaultPage) {
+                    onSteamGuardDefaultPageChange(page)
+                    Toast.makeText(context, restartMessage, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+        SwitchPreference(
+            title = stringResource(R.string.module_steam_guard_next_code),
+            summary = stringResource(R.string.module_steam_guard_next_code_summary),
+            checked = nextCodeEnabled,
+            onCheckedChange = { enabled ->
+                SteamModuleSettings.setSteamGuardNextCodeEnabled(context, enabled)
+                nextCodeEnabled = enabled
+                Toast.makeText(context, restartMessage, Toast.LENGTH_SHORT).show()
+            },
+        )
         SteamMaFileEntry()
         BasicComponent(
             title = stringResource(R.string.module_guest_browsing),
@@ -245,6 +281,16 @@ private fun GeneralPage(
             onClick = {
                 showGlassDialog = true
                 glassHoldDown = true
+            },
+        )
+        SwitchPreference(
+            title = stringResource(R.string.module_library_pinch_zoom),
+            summary = stringResource(R.string.module_library_pinch_zoom_summary),
+            checked = libraryPinchZoomEnabled,
+            onCheckedChange = { enabled ->
+                SteamModuleSettings.setSteamLibraryPinchZoomEnabled(context, enabled)
+                libraryPinchZoomEnabled = enabled
+                Toast.makeText(context, restartMessage, Toast.LENGTH_SHORT).show()
             },
         )
     }

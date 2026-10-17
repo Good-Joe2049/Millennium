@@ -6,7 +6,11 @@ import android.content.Context
 import androidx.core.content.edit
 
 internal enum class SteamWorkingMode(val key: String) {
-    Disabled("disabled"), Shizuku("shizuku"), Root("root"),
+    Disabled("disabled"), Shizuku("shizuku"), Dhizuku("dhizuku"), Root("root"),
+}
+
+internal enum class SteamGuardDefaultPage(val routeName: String) {
+    GuardCode("CodeFallback"), ScanQrCode("GuardHome"),
 }
 
 /** Persistent values used by the module settings page. */
@@ -18,12 +22,49 @@ internal object SteamModuleSettings {
     private const val WORKING_MODE = "module_working_mode"
     private const val LIQUID_GLASS_ENABLED = "module_setting_liquid_glass_enabled"
     private const val STEAM_BOTTOM_GLASS_ENABLED = "steam_bottom_glass_enabled"
+    private const val STEAM_GUARD_DEFAULT_PAGE = "steam_guard_default_page"
+    private const val STEAM_GUARD_NEXT_CODE_ENABLED = "steam_guard_next_code_enabled"
+    private const val STEAM_LIBRARY_PINCH_ZOOM_ENABLED = "steam_library_pinch_zoom_enabled"
+
+    fun isSteamLibraryPinchZoomEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            // Preserve the existing library behavior when upgrading to this setting.
+            .getBoolean(STEAM_LIBRARY_PINCH_ZOOM_ENABLED, true)
+
+    fun setSteamLibraryPinchZoomEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(STEAM_LIBRARY_PINCH_ZOOM_ENABLED, enabled)
+        }
+    }
 
     fun isSteamBottomGlassEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(STEAM_BOTTOM_GLASS_ENABLED, false)
 
     fun setSteamBottomGlassEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(STEAM_BOTTOM_GLASS_ENABLED, enabled) }
+    }
+
+    fun steamGuardDefaultPage(context: Context): SteamGuardDefaultPage {
+        val value = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(STEAM_GUARD_DEFAULT_PAGE, null)
+        return SteamGuardDefaultPage.entries.firstOrNull { it.routeName == value }
+            ?: SteamGuardDefaultPage.ScanQrCode
+    }
+
+    fun setSteamGuardDefaultPage(context: Context, page: SteamGuardDefaultPage) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(STEAM_GUARD_DEFAULT_PAGE, page.routeName)
+        }
+    }
+
+    fun isSteamGuardNextCodeEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(STEAM_GUARD_NEXT_CODE_ENABLED, false)
+
+    fun setSteamGuardNextCodeEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(STEAM_GUARD_NEXT_CODE_ENABLED, enabled)
+        }
     }
 
     fun isSteamDbEnabled(context: Context): Boolean =

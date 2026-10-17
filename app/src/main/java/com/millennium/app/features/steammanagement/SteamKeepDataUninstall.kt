@@ -32,9 +32,17 @@ internal object SteamKeepDataUninstall {
         check(mode != SteamWorkingMode.Disabled && SteamPrivilegeAccess.ready && !SteamPrivilegeAccess.requesting) {
             ModuleLocalization.text(context, R.string.management_enable_mode)
         }
-        if (mode == SteamWorkingMode.Root) {
-            uninstallWithRoot(context)
-            return@withContext
+        when (mode) {
+            SteamWorkingMode.Root -> {
+                uninstallWithRoot(context)
+                return@withContext
+            }
+            SteamWorkingMode.Dhizuku -> {
+                SteamDhizukuAccess.uninstallKeepingData(context)
+                return@withContext
+            }
+            SteamWorkingMode.Shizuku -> Unit
+            SteamWorkingMode.Disabled -> error("No working mode selected")
         }
         val packageService = checkNotNull(SystemServiceHelper.getSystemService("package"))
         val pipe = ParcelFileDescriptor.createPipe()

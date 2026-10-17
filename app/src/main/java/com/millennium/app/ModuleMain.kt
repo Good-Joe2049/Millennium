@@ -8,6 +8,8 @@ import android.view.MotionEvent
 import android.view.View
 import com.millennium.app.core.SteamRuntimeDiagnostics
 import com.millennium.app.features.guest.SteamGuestBrowsingFeature
+import com.millennium.app.features.library.SteamLibraryGridTouchHook
+import com.millennium.app.features.library.SteamLibraryGridDrawHook
 import com.millennium.app.features.steamdb.network.SteamDbConnectionDiagnostics
 import com.millennium.app.features.steamguard.data.SteamGuardStorageHook
 import com.millennium.app.features.steamguard.data.SteamSessionDiagnostics
@@ -61,6 +63,8 @@ class ModuleMain : XposedModule() {
     private val guestBrowsingFeature = SteamGuestBrowsingFeature({ steamContext }) { priority, message ->
         log(priority, "MillenniumGuest", message)
     }
+    private val libraryGridTouchHook = SteamLibraryGridTouchHook()
+    private val libraryGridDrawHook = SteamLibraryGridDrawHook()
     private val steamSessionDiagnostics = SteamSessionDiagnostics(this)
     private var lastTouchTargetLogKey: String? = null
     private var lastTouchTargetLogAt = 0L
@@ -75,6 +79,8 @@ class ModuleMain : XposedModule() {
 
         SteamMaFileDocuments.install(this)
         if (loadedProcess == STEAM_PACKAGE) {
+            runCatching { libraryGridDrawHook.install(this, param.classLoader) }
+            runCatching { libraryGridTouchHook.install(this, param.classLoader) }
             runCatching { guestBrowsingFeature.install(this, param.classLoader) }
                 .onFailure { log(Log.WARN, "MillenniumGuest", "Guest browsing hook unavailable: ${it.javaClass.simpleName}") }
             runCatching { SteamLoginRestore.install(this, param.classLoader) }

@@ -1,8 +1,12 @@
 package com.millennium.app.features.guest
 
+import com.millennium.app.features.steamguard.ui.SteamGuardNextCodeScript
+import com.millennium.app.features.library.SteamLibraryGridScript
+
 /** Small, bundle-specific adapters. Account state and the native login form remain Steam-owned. */
 internal object SteamGuestBrowsingScript {
-    val source = """
+    fun source(defaultRoute: String, nextCodeEnabled: Boolean, libraryPinchZoomEnabled: Boolean): String {
+        return """
 (function(g) {
     'use strict';
     if (g.__millenniumGuestInstalled) return;
@@ -137,8 +141,14 @@ internal object SteamGuestBrowsingScript {
         };
     }
 
-    var targets = { 1136: true, 1476: true, 2125: true, 2135: true, 2455: true };
-    var remaining = 5;
+${SteamGuardDefaultPageScript.source(defaultRoute)}
+${if (nextCodeEnabled) SteamGuardNextCodeScript.source() else ""}
+${if (libraryPinchZoomEnabled) SteamLibraryGridScript.source() else ""}
+
+    var targets = { 1136: true, 1476: true, 2125: true, 2135: true, 2412: true, 2455: true };
+    if ($nextCodeEnabled) targets[2413] = true;
+    if ($libraryPinchZoomEnabled) targets[3466] = true;
+    var remaining = Object.keys(targets).length;
     var define;
     function wrapDefine(originalDefine) {
         return function(factory, id, dependencies) {
@@ -154,7 +164,10 @@ internal object SteamGuestBrowsingScript {
                     if (id === 1136 && dependency === 1366) value = guestNavigation(value, require);
                     if (id === 1476 && dependency === 3459) value = guestHome(value, require);
                     if (id === 2125 && dependency === 2126) value = guestSettingsQuery(value, require);
+                    if (id === 2412 && dependency === 1477) value = guardNavigator(value, require);
+                    if (id === 2413 && dependency === 263) value = guardNextCodeRuntime(value, require);
                     if (id === 2455 && dependency === 2352) value = guestMenu(value, require);
+                    if ($libraryPinchZoomEnabled && id === 3466 && dependency === 263) value = libraryGridRuntime(value, require);
                     cache[dependency] = value;
                     return value;
                 };
@@ -178,4 +191,5 @@ internal object SteamGuestBrowsingScript {
     });
 })(globalThis);
 """.trimIndent()
+    }
 }

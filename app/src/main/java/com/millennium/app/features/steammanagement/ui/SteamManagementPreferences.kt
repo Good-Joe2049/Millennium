@@ -43,6 +43,7 @@ internal fun SteamWorkingModePreference() {
         access.requesting -> R.string.management_permission_waiting
         access.message != null -> access.message
         access.mode == SteamWorkingMode.Root && !access.ready -> R.string.management_root_unavailable
+        access.mode == SteamWorkingMode.Dhizuku && !access.ready -> R.string.management_dhizuku_unavailable
         access.enabled && !access.ready -> R.string.management_service_unavailable
         else -> null
     }
@@ -52,6 +53,7 @@ internal fun SteamWorkingModePreference() {
         items = listOf(
             stringResource(R.string.module_working_mode_disabled),
             stringResource(R.string.module_working_mode_shizuku),
+            stringResource(R.string.module_working_mode_dhizuku),
             stringResource(R.string.module_working_mode_root),
         ),
         selectedIndex = access.mode.ordinal,

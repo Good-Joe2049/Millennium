@@ -3,6 +3,7 @@ package com.millennium.app.features.guest
 import android.content.Context
 import android.util.AtomicFile
 import android.util.Log
+import com.millennium.app.features.ui.settings.SteamModuleSettings
 import io.github.libxposed.api.XposedModule
 import java.io.File
 import java.security.MessageDigest
@@ -16,6 +17,10 @@ internal class SteamGuestBrowsingFeature(
     private var bootstrap: File? = null
 
     fun install(module: XposedModule, loader: ClassLoader) {
+        installBootstrapHook(module, loader)
+    }
+
+    private fun installBootstrapHook(module: XposedModule, loader: ClassLoader) {
         val instance = Class.forName("com.facebook.react.runtime.ReactInstance", false, loader)
         val bundleLoader = Class.forName("com.facebook.react.bridge.JSBundleLoader", false, loader)
         val assetLoader = Class.forName("com.facebook.react.bridge.JSBundleLoader$1", false, loader)
@@ -35,8 +40,6 @@ internal class SteamGuestBrowsingFeature(
                 } else {
                     emit(Log.WARN, "Guest browsing unavailable for this bundle source; native navigation retained")
                 }
-            }.onFailure { error ->
-                emit(Log.WARN, "Guest browsing unavailable: ${error.javaClass.simpleName}")
             }
             chain.proceed()
         }
@@ -63,12 +66,17 @@ internal class SteamGuestBrowsingFeature(
             return null
         }
         val file = File(app.codeCacheDir, "millennium-guest-bootstrap.js")
-        val script = SteamGuestBrowsingScript.source
+        val script = SteamGuestBrowsingScript.source(
+            defaultRoute = SteamModuleSettings.steamGuardDefaultPage(app).routeName,
+            nextCodeEnabled = SteamModuleSettings.isSteamGuardNextCodeEnabled(app),
+            libraryPinchZoomEnabled = SteamModuleSettings.isSteamLibraryPinchZoomEnabled(app),
+        )
+        val bytes = script.toByteArray(Charsets.UTF_8)
         if (!file.isFile || file.readText() != script) {
             val atomic = AtomicFile(file)
             val output = atomic.startWrite()
             try {
-                output.write(script.toByteArray(Charsets.UTF_8))
+                output.write(bytes)
                 atomic.finishWrite(output)
             } catch (error: Exception) {
                 atomic.failWrite(output)
