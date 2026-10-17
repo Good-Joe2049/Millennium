@@ -121,6 +121,10 @@ Open **Steam → Menu → Millennium → General → maFile import and export**.
 - Supports the single-account plaintext maFile format used by **Monica Steam** and **Steam Desktop Authenticator (SDA)**. Import accepts files up to **1 MB**; ZIP archives and encrypted backups are not supported.
 - **Monica Steam interoperability has been tested:** exported maFiles support Steam Guard codes and login approvals on multiple devices. Import the saved file through Monica's own maFile import screen.
 
+**Get from Monica Steam:** on the Import tab, this shortcut requests one account from a compatible Monica Steam installation in the same Android user/profile. Monica requires a configured master password, a fresh unlock, account selection and explicit confirmation. The returned maFile is opened once through a short-lived UID-bound grant, without saving a plaintext temporary file, then shown in the existing preview. Press **Import** to apply it; receiving it does not import or restore automatically. Steam and injected code can retain the credentials after reading them.
+
+This needs a Monica Steam build implementing [maFile handoff protocol v1](docs/monica-mafile-handoff.md), currently being added to its 1.0.310 development tree. Older/missing installations fall back to the existing **Choose maFile** button. This new shortcut needs device interoperability testing; the file-transfer verification above does not establish that the shortcut has been tested with Steam/LSPosed.
+
 ### Restore in the official Steam app
 
 1. On the source phone, open Steam's **Steam Guard** page, then export the account's maFile through Millennium.
@@ -228,7 +232,7 @@ If restoration is unavailable, the file can still be saved and re-exported. A lo
 <details>
 <summary><strong>Can Millennium open Monica and import the account directly?</strong></summary>
 
-Currently, export the maFile and select it in Monica Steam's import screen. Automatic handoff to Monica is not implemented. Direct app-to-app import is available for Stratum and Aegis through the Steam Guard export dialog.
+For **Monica Steam → Millennium**, use **Get from Monica Steam** with a compatible build and approve the request in Monica. For **Millennium → Monica Steam**, export the maFile and select it in Monica Steam's import screen; automatic handoff in that direction is not implemented. Direct app-to-app import is also available for Stratum and Aegis through the Steam Guard export dialog.
 
 </details>
 

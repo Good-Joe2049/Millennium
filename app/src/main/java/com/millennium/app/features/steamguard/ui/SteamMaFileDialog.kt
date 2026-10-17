@@ -139,6 +139,9 @@ private fun MaFileContent(working: Boolean, setWorking: (Boolean) -> Unit, close
                 }
             } else {
                 Note(stringResource(R.string.mafile_import_help))
+                TextButton(text = stringResource(R.string.mafile_from_monica), onClick = { SteamMaFileDocuments.openMonica(context) },
+                    enabled = !busy, modifier = Modifier.fillMaxWidth())
+                Note(stringResource(R.string.mafile_monica_help))
                 TextButton(text = stringResource(R.string.mafile_choose), onClick = { SteamMaFileDocuments.open(context) },
                     enabled = !busy, modifier = Modifier.fillMaxWidth())
                 documents.preview?.let { preview ->

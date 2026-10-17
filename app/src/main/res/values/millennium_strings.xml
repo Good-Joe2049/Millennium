@@ -161,6 +161,10 @@
     <string name="mafile_login_ready">"This file can restore sign-in only; the authenticator secret is missing. Steam verifies the session online."</string>
     <string name="mafile_import_help">"Choose a single-account plaintext maFile up to 1 MB. Import replaces data for the same SteamID and schedules restoration of usable authenticator and login data, including the Steam device ID. Other account records are retained. Force stop and reopen Steam after importing."</string>
     <string name="mafile_choose">"Choose maFile"</string>
+    <string name="mafile_from_monica">"Get from Monica Steam"</string>
+    <string name="mafile_monica_help">"Requires Monica Steam with maFile handoff support in the same Android profile. Unlock it and confirm one account, then preview here before importing. No temporary file is saved by this handoff."</string>
+    <string name="mafile_monica_unavailable">"Could not open Monica Steam. Install a build supporting maFile handoff and allow Steam to open it, or choose an exported maFile instead."</string>
+    <string name="mafile_monica_read_failed">"Could not read the authorized account. The grant may have expired or already been used. Request it from Monica Steam again."</string>
     <string name="mafile_save">"Export file"</string>
     <string name="mafile_import">"Import account"</string>
     <string name="mafile_restore_queued">"Restore scheduled. Force stop Steam in Android settings, then reopen it. Returning from the background is not a full restart."</string>

@@ -151,6 +151,10 @@
     <string name="mafile_login_ready">"文件仅能恢复登录会话，缺少令牌密钥。Steam 会联网验证会话。"</string>
     <string name="mafile_import_help">"选择不超过 1 MB 的单账号明文 maFile。导入会覆盖同一 SteamID 的账号数据，并自动安排恢复可用的令牌和登录数据。设备标识会同步到 Steam，其他账号记录保留。导入后需强行停止并重新打开 Steam。"</string>
     <string name="mafile_choose">"选择 maFile 文件"</string>
+    <string name="mafile_from_monica">"从 Monica Steam 获取"</string>
+    <string name="mafile_monica_help">"需要同一 Android 用户或资料中的 Monica Steam 支持 maFile 授权交付。解锁并确认一个账号后，先在此预览，再确认导入。交付过程不保存临时文件。"</string>
+    <string name="mafile_monica_unavailable">"无法打开 Monica Steam。请安装支持 maFile 授权交付的版本并允许 Steam 打开它，或选择已导出的 maFile 文件。"</string>
+    <string name="mafile_monica_read_failed">"无法读取授权账号，访问可能已过期或被使用，请重新从 Monica Steam 获取。"</string>
     <string name="mafile_save">"导出文件"</string>
     <string name="mafile_import">"导入账号"</string>
     <string name="mafile_restore_queued">"已安排恢复。请在 Android 设置中强行停止 Steam，再重新打开；仅切到后台再返回不会执行恢复。"</string>

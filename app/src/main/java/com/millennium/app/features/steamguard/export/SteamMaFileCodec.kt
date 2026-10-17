@@ -7,7 +7,6 @@ import java.net.URLDecoder
 import java.security.MessageDigest
 import java.util.Base64
 import java.io.InputStream
-import java.io.ByteArrayOutputStream
 
 internal data class SteamMaFile(
     val json: String,
@@ -28,21 +27,11 @@ internal data class SteamMaFile(
 
 /** Single-account, plaintext Monica/SDA JSON. Unknown fields survive a round trip. */
 internal object SteamMaFileCodec {
-    const val MAX_BYTES = 1024 * 1024
+    const val MAX_BYTES = MaFileInput.MAX_BYTES
     private val idPattern = Regex("[0-9]{17}")
     private val idNames = arrayOf("steamid", "steam_id", "SteamID", "steam64", "steam_id64", "steamID64", "SteamID64", "sbeamid")
 
-    fun readBytes(stream: InputStream, limit: Int = MAX_BYTES): ByteArray {
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(8192)
-        while (true) {
-            val count = stream.read(buffer, 0, minOf(buffer.size, limit + 1 - output.size()))
-            if (count == -1) break
-            output.write(buffer, 0, count)
-            require(output.size() <= limit)
-        }
-        return output.toByteArray()
-    }
+    fun readBytes(stream: InputStream, limit: Int = MAX_BYTES): ByteArray = MaFileInput.readBytes(stream, limit)
 
     fun parse(raw: String, fileName: String = ""): SteamMaFile {
         require(raw.toByteArray().size <= MAX_BYTES)
